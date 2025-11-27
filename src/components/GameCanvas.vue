@@ -1,7 +1,7 @@
 <template>
 <div class="canvas"
 :style="{'background-size': 20*s+'px '+20*s+'px', 'background-position': x*s+'px '+y*s+'px'}">
-    <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @wheel="onWheel"></div>
+    <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel"></div>
     <CanvasUser v-for="user in state.users" :key="user.id"
     :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="state.selectedUsers.includes(user.id)" :focused="state.focusedUser==user.id"
     :badge-default="(user.id in appState.uncollectedMessages)?appState.uncollectedMessages[user.id].length:0"
@@ -66,8 +66,61 @@ let multiSelectStartX = 0;
 let multiSelectStartY = 0;
 let mouseX = 0;
 let mouseY = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartCanvasX = 0;
+let touchStartCanvasY = 0;
+let touchesDistance = -1;
 
-function onMousemove(e: MouseEvent)
+function onTouchStart(e: TouchEvent)
+{
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartCanvasX = x.value;
+    touchStartCanvasY = y.value;
+}
+
+function onTouchEnd(e: TouchEvent)
+{
+    touchesDistance = -1;
+}
+
+function onTouchMove(e: TouchEvent)
+{
+    e.preventDefault();
+    if (e.touches.length == 1)
+    {
+        const touch = e.touches[0];
+        mouseX = touch.clientX;
+        mouseY = touch.clientY;
+        x.value = mouseX - touchStartX + touchStartCanvasX;
+        y.value = mouseY - touchStartY + touchStartCanvasY;
+    }
+    else if (e.touches.length == 2)
+    {
+        const x1 = e.touches[0].clientX;
+        const y1 = e.touches[0].clientY;
+        const x2 = e.touches[1].clientX;
+        const y2 = e.touches[1].clientY;
+        const d = Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+        if (touchesDistance>0)
+        {
+            let delta = (d - touchesDistance) * 0.01;
+            if (delta < 0)
+            {
+                delta += 2.0;
+            }
+            if (delta >= 0 && delta <= 2.0)
+            {
+                changeScale((x1+x2)/2, (y1+y2)/2, delta);
+            }
+        }
+        touchesDistance = d;
+    }
+}
+
+function onMousemove(e:any)
 {
     if (e.buttons==4) {
         x.value += e.movementX / s.value;
@@ -78,7 +131,7 @@ function onMousemove(e: MouseEvent)
     multiSelecting = e.buttons==1;
 }
 
-function onMousedown(e: MouseEvent)
+function onMousedown(e:any)
 {
     if (e.buttons==1)
     {
@@ -92,7 +145,7 @@ function onMousedown(e: MouseEvent)
 let bgDownButtons = 0;
 
 
-function onMouseup(e: MouseEvent)
+function onMouseup(e:any)
 {
     if (bgDownButtons == 1)
     {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, Ref, ref } from 'vue';
+import { onMounted, Ref, ref } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
@@ -10,15 +10,15 @@ import { getUserName, processGenerateQueue } from './text';
 import { startGenerateMessage } from './text';
 
 onMounted(()=>{
-    const appstateSource = localStorage.getItem('appstate');
-    if (appstateSource != null)
-    {
-        appState.value = JSON.parse(appstateSource);
-    }
     const progressSource = localStorage.getItem('progress');
     if (progressSource != null)
     {
         setProgress(JSON.parse(progressSource));
+    }
+    const appstateSource = localStorage.getItem('appstate');
+    if (appstateSource != null)
+    {
+        appState.value = JSON.parse(appstateSource);
     }
     else
     {
@@ -116,12 +116,16 @@ subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
     processGenerateQueue();
 }, 1000);
+setInterval(() => {
+    windowWidth.value = window.innerWidth;
+}, 1);
+const windowWidth = ref(0);
 </script>
 
 <template>
 <div class="app">
     <GameCanvas :app-state="appState" ref="canvas"/>
-    <n-drawer v-model:show="showUserEditor" :width="600">
+    <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth">
         <n-drawer-content :native-scrollbar="false">
             <template #header>
                 <NPageHeader subtitle="用户分析" @back="appState.editingUser=-1;showUserEditor=false"></NPageHeader>
@@ -184,5 +188,10 @@ body
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+@media (max-width: 500px) {
+    .user-editor-container {
+        width: 400px;
+    }
 }
 </style>

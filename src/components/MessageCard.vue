@@ -8,7 +8,7 @@
     </template>
     <n-skeleton v-if="content==''" text :repeat="2"/>
     <div v-else>
-        时间:{{msg.t}}<br/>{{ content }}
+        <p>{{msg.t}}</p><p>{{ content }}</p>
     </div>
     <template #action>
         <slot name="action"></slot>

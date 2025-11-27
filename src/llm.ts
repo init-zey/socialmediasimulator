@@ -1,7 +1,10 @@
 import OpenAI from "openai"
+import dotenv from 'dotenv'
+
+dotenv.config();
 
 const client = new OpenAI({
-    apiKey: "sk-uFDUPAriuBg6l84rhrFxcRect2V0gpH59KVXj8dxG6wblr5p",
+    apiKey: process.env.API_KEY,
     baseURL: "http://localhost:8080/llmapi",
     dangerouslyAllowBrowser: true
 })

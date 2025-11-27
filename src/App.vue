@@ -3,53 +3,63 @@ import { onMounted, Ref, ref } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
-import { rSet, createUser, Message, progress, createMessage, processPushTask, setProgress } from './game';
+import { createUser, Message, progress, processPushTask, setProgress, getSubjectUserGraph, rSetIn, rGetIn, updateUsers } from './game';
 import { subscribe } from './event';
 import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NModal, NCard, NFlex } from 'naive-ui';
-import { getUserName, processGenerateQueue } from './text';
+import { getUserName, processGenerateQueue, text } from './text';
 import { startGenerateMessage } from './text';
 
 onMounted(()=>{
-    const progressSource = localStorage.getItem('progress');
-    if (progressSource != null)
-    {
-        setProgress(JSON.parse(progressSource));
-    }
-    const appstateSource = localStorage.getItem('appstate');
-    if (appstateSource != null)
-    {
-        appState.value = JSON.parse(appstateSource);
-    }
-    else
-    {
-        for(let i=0;i<10;i++)
+    // const progressSource = localStorage.getItem('progress');
+    // if (progressSource != null)
+    // {
+    //     setProgress(JSON.parse(progressSource));
+    // }
+    // else
+    // {
+        
+    // }
+    // const appstateSource = localStorage.getItem('appstate');
+    // if (appstateSource != null)
+    // {
+    //     appState.value = JSON.parse(appstateSource);
+    // }
+    // window.addEventListener('beforeunload', ()=>{
+    //     localStorage.setItem('appstate', JSON.stringify(appState.value))
+    //     localStorage.setItem('progress', JSON.stringify(progress));
+    // });
+    createUser(0);
+    createUser(0);
+    createUser(1);
+    createUser(1);
+    text.userTexts.push(
         {
-            createUser();
-            for(let j=0;j<i;j++){
-                const v = Math.floor(Math.random()*3)-1;
-                rSet(i,j,v);
-                if (Math.abs(v)>0.5)
-                {
-                    if (Math.random()>0.5)
-                    {
-                        createMessage(i,j,v);
-                    }
-                    else
-                    {
-                        createMessage(j,i,v);
-                    }
-                }
-            }
+            name: "学生",
+            prompt: ""
+        },
+        {
+            name: "丘",
+            prompt: ""
+        },
+        {
+            name: "人品",
+            prompt: ""
+        },
+        {
+            name: "数学",
+            prompt: ""
         }
-    }
-    window.addEventListener('beforeunload', ()=>{
-        localStorage.setItem('appstate', JSON.stringify(appState.value))
-        localStorage.setItem('progress', JSON.stringify(progress));
-    });
+    );
+    const studenGraph = getSubjectUserGraph(0);
+    rSetIn(0,1,-1,studenGraph);
+    rSetIn(0,2,2,studenGraph);
+    rSetIn(0,3,1,studenGraph);
+    rSetIn(1,2,-1,studenGraph);
+    rSetIn(1,3,1,studenGraph);
 });
 
 export interface AppState {
-        mode: "user-edit" | "broadcast";
+        mode: "user-edit" | "connect" | "disconnect";
         editingUser: number;
         uncollectedMessages: Record<number,Array<number>>;
         collectedMessages: Array<number>;
@@ -72,18 +82,17 @@ function getUserMessages(author:number)
 {
     return messages.value.filter(m=>m.i==author);
 }
-function getUserPushableMessages(user:number)
-{
-    return appState.value.collectedMessages.map(mid=>progress.messages[mid]).filter(m=>m.i!=user&&(progress.userMemory[user]==undefined||progress.userMemory[user].includes(m.id)))
-}
 
 subscribe('userPressed', (id)=>
 {
-    if (appState.value.mode=="user-edit")
+    if (progress.userType[id]==0)
     {
-        if (!(id in appState.value.readyToPushMessages)) {appState.value.readyToPushMessages[id] = []}
-        showUserEditor.value = true;
-        appState.value.editingUser = id;
+        if (appState.value.mode=="user-edit")
+        {
+            if (!(id in appState.value.readyToPushMessages)) {appState.value.readyToPushMessages[id] = []}
+            showUserEditor.value = true;
+            appState.value.editingUser = id;
+        }
     }
 })
 
@@ -107,10 +116,11 @@ function collectMsg(msg:Message)
 function finishRound()
 {
     progress.time += 1;
-    // appState.value.uncollectedMessages = {};
+    appState.value.uncollectedMessages = {};
     // appState.value.collectedMessages = appState.value.collectedMessages.filter(msg=>progress.time-msg.t<=1);
     processPushTask(appState.value.readyToPushMessages);
     appState.value.readyToPushMessages = {};
+    updateUsers();
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
@@ -125,7 +135,7 @@ const windowWidth = ref(0);
 <template>
 <div class="app">
     <GameCanvas :app-state="appState" ref="canvas"/>
-    <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth">
+    <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth" @update-show="(show)=>{if(!show)appState.editingUser=-1}">
         <n-drawer-content :native-scrollbar="false">
             <template #header>
                 <NPageHeader subtitle="用户分析" @back="appState.editingUser=-1;showUserEditor=false"></NPageHeader>
@@ -143,14 +153,14 @@ const windowWidth = ref(0);
                     </MessageCard>
                 </n-tab-pane>
                 <n-tab-pane name="history" tab="历史发言">
-                    <MessageList :source="getUserMessages(appState.editingUser)" :select="false"/>
+                    <MessageList :source="getUserMessages(appState.editingUser)" :filter="(msg)=>true" :select="false"/>
                 </n-tab-pane>
                 <n-tab-pane name="push-list" tab="本次推送">
                     <!-- <n-flex justify="center">
                         <n-button @click="selectMessageModal=true" :disabled="getUserPushableMessages(appState.editingUser).length==0">修改</n-button>
                     </n-flex>
                     <MessageCard :msg="progress.messages[msgId]" v-for="msgId in (appState.readyToPushMessages[appState.editingUser])" :key="msgId"/> -->
-                    <MessageList :source="getUserPushableMessages(appState.editingUser)" :select="true" v-model="appState.readyToPushMessages[appState.editingUser]"/>
+                    <MessageList :source="appState.collectedMessages.map(mid=>progress.messages[mid])" :filter="m=>m.i!=appState.editingUser&&((!(appState.editingUser in progress.userMemory))||progress.userMemory[appState.editingUser].includes(m.id))" :select="true" v-model="appState.readyToPushMessages[appState.editingUser]"/>
                 </n-tab-pane>
             </n-tabs>
         </n-drawer-content>
@@ -161,7 +171,7 @@ const windowWidth = ref(0);
     </div>
     <n-modal v-model:show="collectedMessagesModal">
     <n-card style="width: 600px" title="已收集消息">
-    <MessageList :source="appState.collectedMessages.map(mid=>progress.messages[mid])" :select="false"/>
+    <MessageList :source="appState.collectedMessages.map(mid=>progress.messages[mid])" :filter="(msg)=>true" :select="false"/>
     </n-card>
     </n-modal>
 </div>

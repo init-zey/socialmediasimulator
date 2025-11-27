@@ -10,11 +10,11 @@ striped />
 </template>
 
 <script setup lang="ts">
-import { Message } from '@/game';
+import { Message, progress } from '@/game';
 import { DataTableColumns } from 'naive-ui';
 import { defineProps, defineModel } from 'vue';
 import { NDataTable } from 'naive-ui';
-const props = defineProps<{source:Array<Message>,select:boolean}>();
+const props = defineProps<{source:Array<Message>,filter:(msg:Message)=>boolean,select:boolean}>();
 
 const checkedRowKeys=defineModel<Array<number>>();
 
@@ -45,7 +45,8 @@ if (props.select)
 {
   columns = [{
     type: 'selection',
-    multiple: true
+    multiple: true,
+    disabled: (row)=>!props.filter(progress.messages[row.id])
   }, ...columns]
 }
 

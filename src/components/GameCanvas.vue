@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { getRepulsion, progress, rGet, rSet } from '../game'
+import { getRepulsion, getSubjectUserGraph, progress, rGetIn } from '../game'
 import { defineProps, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { subscribe } from '../event'
@@ -239,28 +239,6 @@ onMounted(()=>{
     linesCanvas = document.getElementById('lines');
     linesCtx = linesCanvas.getContext("2d");
     setInterval(physicsProcess,delta*1000);
-    document.addEventListener('keydown', (e)=>{
-        const focusedUser = state.value.focusedUser;
-        if(e.key=='a' && e.ctrlKey && focusedUser>=0)
-        {
-            state.value.selectedUsers.forEach(user=>{
-                if (user==focusedUser) return;
-                rSet(user, focusedUser, 1);
-            })
-        }
-        else if(e.key=='c' && e.ctrlKey && focusedUser>=0)
-        {
-            state.value.selectedUsers.forEach(user=>{
-                if (user==focusedUser) return;
-                rSet(user, focusedUser, 0);
-            })
-        }
-        else if (e.key=='Escape')
-        {
-            state.value.selectedUsers = [];
-            state.value.focusedUser = -1;
-        }
-    });
     subscribe("createdUser", (id:number)=>{
         state.value.users.push({
             id: id,
@@ -269,6 +247,9 @@ onMounted(()=>{
             vx: 0,
             vy: 0
         });
+    });
+    subscribe("removedUser", ()=>{
+        state.value.users.pop();
     });
 });
 
@@ -304,24 +285,58 @@ function redraw()
 {
     linesCanvas.width = window.innerWidth;
     linesCanvas.height = window.innerHeight;
-    Object.entries(progress.userGraph).forEach(([k,v])=>
+    if (props.appState.editingUser >= 0)
     {
-        const splited = k.split('_');
-        const fromId = parseInt(splited[0],32);
-        const toId = parseInt(splited[1],32);
-        const from = state.value.users[fromId];
-        const to = state.value.users[toId];
-        const r = rGet(fromId, toId);
-        let a = Math.abs(r);
-        if (a < 0) return;
-        const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
-        // const style = `#000`;
-        linesCtx.strokeStyle = style;
-        linesCtx.beginPath();
-        linesCtx.moveTo((from.x+x.value)*s.value, (from.y+y.value)*s.value);
-        linesCtx.lineTo((to.x+x.value)*s.value, (to.y+y.value)*s.value);
-        linesCtx.stroke();
-    });
+        const graph = getSubjectUserGraph(props.appState.editingUser);
+        Object.entries(graph).forEach(([k,r])=>{
+            const splited = k.split('_');
+            const fromId = parseInt(splited[0],32);
+            const toId = parseInt(splited[1],32);
+            const from = state.value.users[fromId];
+            const to = state.value.users[toId];
+            let a = Math.abs(r);
+            if (a > 1) a = 1;
+            if (a < 0) return;
+            const x1 = (from.x+x.value)*s.value;
+            const y1 = (from.y+y.value)*s.value;
+            const x2 = (to.x+x.value)*s.value;
+            const y2 = (to.y+y.value)*s.value;
+            linesCtx.strokeStyle = '#000';
+            linesCtx.font = "16px Arial";
+            linesCtx.fillText(r.toFixed(2).toString(), (x1+x2)*0.5, (y1+y2)*0.5);
+            const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
+            // const style = `#000`;
+            linesCtx.strokeStyle = style;
+            linesCtx.beginPath();
+            linesCtx.moveTo(x1, y1);
+            linesCtx.lineTo(x2, y2);
+            linesCtx.stroke();
+        });
+    }
+    else
+    {
+        for (const fromId in progress.subjectiveUserGraph)
+        {
+            const from = state.value.users[fromId];
+            Object.entries(progress.subjectiveUserGraph[fromId]).forEach(([k,r])=>{
+                const splited = k.split('_');
+                const keyFrom = splited[0];
+                if (keyFrom != (fromId.toString())) return;
+                const toId = parseInt(splited[1],32);
+                const to = state.value.users[toId];
+                let a = Math.abs(r);
+                if (a > 1) a = 1;
+                if (a < 0) return;
+                const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
+                // const style = `#000`;
+                linesCtx.strokeStyle = style;
+                linesCtx.beginPath();
+                linesCtx.moveTo((from.x+x.value)*s.value, (from.y+y.value)*s.value);
+                linesCtx.lineTo((to.x+x.value)*s.value, (to.y+y.value)*s.value);
+                linesCtx.stroke();
+            })
+        }
+    }
     // for(let i=0;i<progress.userCount;i++)
     // {
     //     for(let j=i+1;j<progress.userCount;j++)

@@ -14,11 +14,13 @@ export interface MessageText {
 }
 
 export let text:{
-    userTexts:Array<UserText>
-    messageTexts:Array<MessageText>
+    userTexts:Array<UserText>,
+    messageTexts:Array<MessageText>,
+    generateQueue:Array<number>
 }={
     userTexts: [],
-    messageTexts: []
+    messageTexts: [],
+    generateQueue: []
 }
 
 const textSource = localStorage.getItem('text');
@@ -87,17 +89,15 @@ function getMessageMinimumVersionPrompt(content:string):string
     return `[${content}]一句话总结这篇社媒博文。`;
 }
 
-const generateQueue:Array<Message> = []
-
 let generating = false;
 
 export async function processGenerateQueue()
 {
-    if (generating || generateQueue.length==0) return;
+    if (generating || text.generateQueue == undefined || text.generateQueue.length==0) return;
     console.log("生成新消息");
     generating = true;
-    const msg = generateQueue[0];
-    if (text.messageTexts.length - 1 < msg.id)
+    const msg = text.generateQueue[0];
+    if (text.messageTexts.length - 1 < msg)
     {
         text.messageTexts.push({
             title: "",
@@ -105,22 +105,22 @@ export async function processGenerateQueue()
             minimumVersion: ""
         });
     }
-    const content = await chat(getMessageContentPrompt(msg));
+    const content = await chat(getMessageContentPrompt(progress.messages[msg]));
     const title = await chat(getMessageTitlePrompt(content));
     const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
-    text.messageTexts[msg.id] = {title, content, minimumVersion}
+    text.messageTexts[msg] = {title, content, minimumVersion}
     localStorage.setItem('text', JSON.stringify(text));
-    emit("generatedMessage", msg.id, title, content);
-    generateQueue.shift();
+    emit("generatedMessage", msg, title, content);
+    text.generateQueue.shift();
     generating = false;
     console.log("消息生成完毕");
 }
 
 export async function startGenerateMessage(msg:Message)
 {
-    if (msg.id>=text.messageTexts.length || text.messageTexts[msg.id].title == '')
+    if (text.generateQueue != undefined && (msg.id>=text.messageTexts.length || text.messageTexts[msg.id].title == ''))
     {
-        generateQueue.push(msg);
+        text.generateQueue.push(msg.id);
     }
 }
 

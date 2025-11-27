@@ -74,22 +74,30 @@ let touchesDistance = -1;
 
 function onTouchStart(e: TouchEvent)
 {
-    const touch = e.touches[0];
-    touchStartX = touch.clientX;
-    touchStartY = touch.clientY;
-    touchStartCanvasX = x.value;
-    touchStartCanvasY = y.value;
+    e.preventDefault();
+    if (e.touches.length == 1)
+    {
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartCanvasX = x.value;
+        touchStartCanvasY = y.value;
+    }
 }
 
 function onTouchEnd(e: TouchEvent)
 {
-    touchesDistance = -1;
+    e.preventDefault();
+    if (e.touches.length == 0)
+    {
+        touchesDistance = -1;
+    }
 }
 
 function onTouchMove(e: TouchEvent)
 {
     e.preventDefault();
-    if (e.touches.length == 1)
+    if (e.touches.length == 1 && touchesDistance == -1)
     {
         const touch = e.touches[0];
         mouseX = touch.clientX;
@@ -107,14 +115,20 @@ function onTouchMove(e: TouchEvent)
         if (touchesDistance>0)
         {
             let delta = (d - touchesDistance) * 0.01;
-            if (delta < 0)
+            if (delta < -1)
             {
-                delta += 2.0;
+                delta = -1;
             }
-            if (delta >= 0 && delta <= 2.0)
+            if (delta > 1)
             {
-                changeScale((x1+x2)/2, (y1+y2)/2, delta);
+                delta = 1;
             }
+            delta += 1;
+            // if (delta < 0)
+            // {
+            //     delta += 1;
+            // }
+            changeScale((x1+x2)/2, (y1+y2)/2, delta);
         }
         touchesDistance = d;
     }

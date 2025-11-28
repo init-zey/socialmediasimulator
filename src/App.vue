@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
-import { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress, resetProgress } from './game';
+import game, { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress, resetProgress } from './game';
 import { subscribe } from './event';
 import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
@@ -194,10 +194,10 @@ subscribe('resetProgress', ()=>{
 });
 function gameInit()
 {
-    createUser(0);
-    createUser(0);
-    createUser(0);
-    createUser(0);
+    for(let i=0;i<Math.random()*4+4;i++)
+    {
+        createUser(0);
+    }
     for(let p=0;p<progress.userCount;p++)
     {
         const G = getSubjectUserGraph(p);
@@ -208,29 +208,11 @@ function gameInit()
         //         rSetIn(x,o,1,G);
         //     }
         // }
-        for(let x=0;x<4;x++)
+        for(let x=0;x<progress.userCount;x++)
         {
             rSetIn(p,x,(Math.random()*2-1)*2,G);
         }
     }
-    text.userTexts.push(
-        {
-            name: "A",
-            prompt: ""
-        },
-        {
-            name: "B",
-            prompt: ""
-        },
-        {
-            name: "C",
-            prompt: ""
-        },
-        {
-            name: "D",
-            prompt: ""
-        }
-    );
     finishRound();
 }
 </script>
@@ -276,8 +258,9 @@ function gameInit()
             </template>
         </MessageCard>
     </n-modal>
-    <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
-        <n-drawer-content>
+    <MessageFlow style="box-shadow: none; background: none; border: none; padding: 20px; z-index: 999; position: fixed; left: 20px; top: 20px; bottom: 20px;" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
+    <!-- <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
+        <n-drawer-content :body-style="'background-color:transparent;' :body-content-style=""">
             <div class="flows">
                 <n-flex class="noscroll" style="flex-grow: 1;overflow-y:scroll;">
                     <MessageFlow v-for="i,flow in appState.flows.length" :key="flow" v-model:label="text.flowLabel[flow]" v-model:source="appState.flows[flow]" :flow="flow"/>
@@ -292,7 +275,7 @@ function gameInit()
                 <n-page-header subtitle="推送流" @back="showFlowsEditor=false"></n-page-header>
             </div>
         </n-drawer-content>
-    </n-drawer>
+    </n-drawer> -->
         <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth" @update-show="(show)=>{if(!show){
             progress.userFlowTags[appState.editingUser]=editingFlowTags.map(label=>text.flowLabel.indexOf(label)).filter(flow=>flow>0);
             console.log(progress.userFlowTags[appState.editingUser]);
@@ -303,7 +286,7 @@ function gameInit()
                     <n-page-header subtitle="用户分析" @back="showUserEditor=false"></n-page-header>
                     <h1>#{{ getUserName(appState.editingUser) }}</h1>
                 </template>
-                <p>
+                <!-- <p>
                 <n-dynamic-tags v-model:value="editingFlowTags" @create=onCreateFlowTag>
                     <template #input="{ submit, deactivate }">
                     <n-auto-complete
@@ -318,9 +301,9 @@ function gameInit()
                     />
                     </template>
                 </n-dynamic-tags>
-                </p>
-                <n-tabs class="user-editor" type="segment" animated>
-                    <n-tab-pane name="new" tab="最新发言">
+                </p> -->
+                <!--<n-tabs class="user-editor" type="segment" animated>
+                    <n-tab-pane name="new" tab="最新发言">-->
                         <MessageCard :msg="progress.messages[msgId]" v-for="msgId in (appState.uncollectedMessages[appState.editingUser])" :key="msgId">
                             <template #action>
                                 <n-flex justify="space-between">
@@ -329,16 +312,16 @@ function gameInit()
                                 </n-flex>
                             </template>
                         </MessageCard>
-                    </n-tab-pane>
+                    <!--</n-tab-pane>
                     <n-tab-pane name="history" tab="历史发言">
                         <MessageList :source="getUserMessages(appState.editingUser)" :filter="(msg)=>true" :select="false"/>
                     </n-tab-pane>
-                </n-tabs>
+                </n-tabs>-->
             </n-drawer-content>
         </n-drawer>
         <div class="pagebottom">
             <div class="buttons">
-                <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button>
+                <!-- <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button> -->
             </div>
             <div class="score">
                 <n-icon><Time/></n-icon> {{ gameTime }} <n-icon><Network1/></n-icon> <n-number-animation :to="gameScore"/>

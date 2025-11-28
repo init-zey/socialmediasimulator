@@ -1,8 +1,7 @@
 <template>
     <n-card class="flow noscroll">
         <center>
-            <n-tag v-if="flow==0">主推送流</n-tag>
-            <n-input v-else v-model:value="label" size="small" type="text" placeholder="自定义推送流"/>
+            <n-input v-if="flow!=0" v-model:value="label" size="small" type="text" placeholder="自定义推送流"/>
         </center>
         <draggable
             v-model="source"

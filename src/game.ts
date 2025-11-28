@@ -12,6 +12,8 @@ export interface Progress{
   time: number;
 }
 
+export let debugMode = false;
+
 export let progress:Progress = {
   userMemory: {},
   subjectiveUserGraph: {},
@@ -91,7 +93,7 @@ function changeAttitude(user:number, target:number, d:number):number
   const graph = getSubjectUserGraph(user);
   const value=rGetIn(user,target,graph)+d;
   rSetIn(user,target,value,graph);
-  if (Math.abs(d) > 0.5) createMessage(user,target,value);
+  if (Math.abs(d)>0.5) createMessage(user,target,value);
   return d;
 }
 
@@ -110,12 +112,11 @@ function updateUser(user:number)
       maxIPD_o = o;
     }
   }
-  console.log(`maxIPD=${maxIPD},maxIPD_o=${maxIPD_o}`);
   if(maxIPD_o>=0)
-  {
-    if (maxIPD < 0.1) maxIPD = 0.1;
-    if (maxIPD > 10) maxIPD = 10;
-    changeAttitude(user, maxIPD_o, -maxIPD);
+    {
+      maxIPD = Math.atan(maxIPD);
+      console.log(`maxIPD=${maxIPD},maxIPD_o=${maxIPD_o}`);
+      changeAttitude(user, maxIPD_o, -1/maxIPD);
   }
 }
 
@@ -176,7 +177,7 @@ export function pushMsgToUser(msg:Message, user:number)
   const d = oldInstability - newInstability;
   console.log('d:',d);
   emit('viewedMessage', msg.id, Math.abs(d));
-  emit('likedMessage', msg.id, d>0?d:0+Math.random()*Math.abs(d)*0.5);
+  emit('likedMessage', msg.id, d>0?d:(Math.random()*Math.abs(d)*0.5));
 }
 
 export function updateUsers()
@@ -230,3 +231,11 @@ export function removeUser()
 }
 
 export default {}
+
+export function executeCommand(cmd:string[])
+{
+  if (cmd[0]=='debug')
+  {
+    debugMode = !debugMode;
+  }
+}

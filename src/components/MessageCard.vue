@@ -4,11 +4,12 @@
         <n-skeleton v-if="title==''" :width="100" round />
         <div v-else>
             <h3><n-ellipsis :line-clamp="2">{{ title }}</n-ellipsis></h3>
+            <p>{{ getUserName(msg.i) }} 发布于 {{msg.t}}</p>
         </div>
     </template>
     <n-skeleton v-if="content==''" text :repeat="2"/>
     <div v-else>
-        <p>{{msg.t}}</p><p><n-ellipsis :line-clamp="2">{{ content }}</n-ellipsis></p>
+        <p><n-ellipsis :line-clamp="2">{{ content }}</n-ellipsis></p>
     </div>
     <slot name="suffix"></slot>
     <template #action>
@@ -21,7 +22,7 @@
 import { Message } from '@/game';
 import { defineProps, ref } from 'vue';
 import { NCard, NSkeleton, NEllipsis } from 'naive-ui';
-import { text } from '@/text';
+import { getUserName, text } from '@/text';
 
 const props = defineProps<{msg:Message}>();
 let title = ref("");

@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { getRepulsion, getSubjectUserGraph, progress, rGetIn } from '../game'
+import { debugMode, getRepulsion, getSubjectUserGraph, progress, rGetIn } from '../game'
 import { defineProps, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { subscribe } from '../event'
@@ -301,9 +301,12 @@ function redraw()
             const y1 = (from.y+y.value)*s.value;
             const x2 = (to.x+x.value)*s.value;
             const y2 = (to.y+y.value)*s.value;
-            linesCtx.strokeStyle = '#000';
-            linesCtx.font = "16px Arial";
-            linesCtx.fillText(r.toFixed(2).toString(), (x1+x2)*0.5, (y1+y2)*0.5);
+            if (debugMode)
+            {
+                linesCtx.strokeStyle = '#000';
+                linesCtx.font = "16px Arial";
+                linesCtx.fillText(r.toFixed(2).toString(), (x1+x2)*0.5, (y1+y2)*0.5);
+            }
             const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
             // const style = `#000`;
             linesCtx.strokeStyle = style;

@@ -70,7 +70,6 @@ onMounted(()=>{
             prompt: ""
         }
     );
-    // const studenGraph = getSubjectUserGraph(0);
 });
 
 export interface AppState {

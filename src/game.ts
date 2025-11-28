@@ -1,6 +1,6 @@
 import { emit } from "./event";
 
-export interface Message {id:number, i:number, j:number, v:number, t:number}
+export interface Message {id:number, a:number, i:number, j:number, v:number, t:number}
 
 export interface Progress{
   userMemory: Record<number, Array<number>>;
@@ -8,8 +8,10 @@ export interface Progress{
   messages: Array<Message>;
   userCount: number;
   userType: Array<number>;
+  userLearnRate: Array<number>;
   userFlowTags: Array<Array<number>>;
   time: number;
+  score: number;
 }
 
 export let debugMode = false;
@@ -19,9 +21,11 @@ export let progress:Progress = {
   subjectiveUserGraph: {},
   messages: [],
   userType: [],
+  userLearnRate: [],
   userCount: 0,
   userFlowTags: [],
-  time: 0
+  time: 0,
+  score: 0
 }
 
 export function setProgress(newProgress:Progress)
@@ -75,25 +79,28 @@ export function processPushTask(tasks:Array<number>,flow:number)
     if (progress.userType[user]!=0) continue;
     const flowTags = progress.userFlowTags[user];
     if (flow!=0&&(flowTags==undefined||!flowTags.includes(flow))) continue;
-    for(const msgId of tasks){
-      pushMsgToUser(progress.messages[msgId], user);
+    for(let i=0;i<tasks.length;i++){
+      pushMsgToUser(progress.messages[tasks[i]], user, tasks.length-i);
     }
   }
 }
 
-export function createMessage(i:number, j:number, v:number)
+export function createMessage(a:number, i:number, j:number, v:number)
 {
-  const msg = {id:progress.messages.length,i,j,v,t:progress.time};
+  const msg = {id:progress.messages.length,a,i,j,v,t:progress.time};
   progress.messages.push(msg);
   emit('addedMessage', msg);
 }
 
-function changeAttitude(user:number, target:number, d:number):number
+function changeAttitude(user:number, a:number, b:number, d:number):number
 {
   const graph = getSubjectUserGraph(user);
-  const value=rGetIn(user,target,graph)+d;
-  rSetIn(user,target,value,graph);
-  if (Math.abs(d)>0.2) createMessage(user,target,value);
+  const value=rGetIn(a,b,graph)+d;
+  rSetIn(a,b,value,graph);
+  if (Math.abs(d)>0.2)
+  {
+    createMessage(user,a,b,value);
+  }
   return d;
 }
 
@@ -102,20 +109,27 @@ function updateUser(user:number)
   console.log(`update ${user}`);
   let maxIPD = 0;
   let maxIPD_o = -1;
+  let maxIPD_x = -1;
+  const G = getSubjectUserGraph(user);
   for(let o=0;o<progress.userCount;o++)
   {
-    const IPD = instabilityPartialD(user, o);
-    console.log(`IPD(${user},${o})=${IPD}`);
-    if (Math.abs(IPD) > Math.abs(maxIPD))
+    for(let x=0;x<progress.userCount;x++)
     {
-      maxIPD = IPD;
-      maxIPD_o = o;
+      let IPD = instabilityPartialD(o,x,G);
+      if (o!=user) IPD *= (1-progress.userLearnRate[user]);
+      if (Math.abs(IPD) > Math.abs(maxIPD))
+      {
+        maxIPD = IPD;
+        maxIPD_o = o;
+        maxIPD_x = x;
+      }
     }
   }
   if(maxIPD_o>=0)
-    {
-      console.log(`maxIPD=${maxIPD},maxIPD_o=${maxIPD_o}`);
-      changeAttitude(user, maxIPD_o, -Math.atan(maxIPD)/3.14);
+  {
+    const dAttitude = -Math.atan(maxIPD)/3.14;
+    console.log(`Dmax|dG(${maxIPD_o},${maxIPD_x})=${maxIPD},dAttitude=${dAttitude}`);
+    changeAttitude(user, maxIPD_o, maxIPD_x, dAttitude);
   }
 }
 
@@ -126,7 +140,7 @@ function instability(p:number)
   for(let x=0;x<progress.userCount;x++)
   {
     const Gpx = rGetIn(p,x,G);
-    for(let o=0;o<progress.userCount;o++)
+    for(let o=x;o<progress.userCount;o++)
     {
       const Gpo = rGetIn(p,o,G);
       const Gox = rGetIn(o,x,G);
@@ -145,9 +159,8 @@ function instability(p:number)
 //   return (pdir + ndir) * 0.5;
 // }
 
-function instabilityPartialD(p:number,o:number)
+function instabilityPartialD(p:number,o:number,G:Record<string,number>)
 {
-  const G = getSubjectUserGraph(p);
   let d = 0;
   const Gpo = rGetIn(p,o,G);
   for(let x=0;x<progress.userCount;x++)
@@ -162,7 +175,7 @@ function instabilityPartialD(p:number,o:number)
   return d;
 }
 
-export function pushMsgToUser(msg:Message, user:number)
+export function pushMsgToUser(msg:Message, user:number, exposure:number)
 {
   if(!(user in progress.userMemory))
   {
@@ -171,12 +184,17 @@ export function pushMsgToUser(msg:Message, user:number)
   progress.userMemory[user].push(msg.id);
   const graph = getSubjectUserGraph(user);
   const oldInstability = instability(user);
-  rSetIn(msg.i,msg.j,msg.v,graph);
+  const ox = rGetIn(msg.i,msg.j,graph);
+  const lambda = progress.userLearnRate[user];
+  rSetIn(msg.i,msg.j,ox+lambda*rGetIn(user,msg.a,graph)*(msg.v-ox),graph);
   const newInstability = instability(user);
   const d = oldInstability - newInstability;
-  console.log('d:',d);
-  emit('viewedMessage', msg.id, Math.abs(d));
-  emit('likedMessage', msg.id, d>0?d:(Math.random()*Math.abs(d)*0.5));
+  const views = Math.abs(d);
+  const likes = d>0?d:(Math.random()*Math.abs(d)*0.5);
+  emit('viewedMessage', msg.id, views);
+  emit('likedMessage', msg.id, likes);
+  emit('messageKnownExposure', msg.id, exposure);
+  emit('messageGainedScore', msg.id, Math.floor((views+likes)*exposure));
 }
 
 export function updateUsers()
@@ -214,11 +232,12 @@ export function getRepulsion(i:number, j:number):boolean
     return repulsion;
 }
 
-export function createUser(type:number)
+export function createUser(type:number,learnRate:number=0.5)
 {
     const id = progress.userCount;
     progress.userCount += 1;
     progress.userType.push(type);
+    progress.userLearnRate.push(learnRate);
     emit("createdUser",id);
 }
 

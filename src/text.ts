@@ -12,7 +12,7 @@ export interface MessageText {
     minimumVersion: string
 }
 
-export const text:{
+export let text:{
     userTexts:Array<UserText>,
     messageTexts:Array<MessageText>,
     generateQueue:Array<number>,
@@ -24,10 +24,13 @@ export const text:{
     flowLabel: ['主推送流']
 }
 
-const textSource = localStorage.getItem('text');
-if (textSource != null)
+export function loadText()
 {
-    // text = JSON.parse(textSource);
+    const textSource = localStorage.getItem('text');
+    if (textSource != null)
+    {
+        text = JSON.parse(textSource);
+    }
 }
 
 function getUserText(id:number):UserText
@@ -115,7 +118,7 @@ export async function processGenerateQueue()
         let describe = '不感兴趣'
         if (msgObj.v>0.5) describe='认同';
         if (msgObj.v<-0.5) describe='反对';
-        const content = `我对${getUserName(msgObj.j)}${describe}。`;
+        const content = `${getUserName(msgObj.i)}对${getUserName(msgObj.j)}${describe}。`;
         const title = "消息"+msg.toString();
         const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
         text.messageTexts[msg] = {title, content, minimumVersion}

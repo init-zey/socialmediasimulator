@@ -3,19 +3,21 @@ import { computed, nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
-import { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers } from './game';
+import { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress } from './game';
 import { subscribe } from './event';
-import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation } from 'naive-ui';
-import { getUserName, processGenerateQueue, text } from './text';
+import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
+import { getUserName, loadText, processGenerateQueue, text } from './text';
 import { startGenerateMessage } from './text';
 import MessageFlow from './components/MessageFlow.vue';
-import { View, ThumbsUp } from '@vicons/carbon'
+import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
 
 onMounted(()=>{
     // const progressSource = localStorage.getItem('progress');
     // if (progressSource != null)
     // {
     //     setProgress(JSON.parse(progressSource));
+    //     gameScore.value = progress.score;
+    //     gameTime.value = progress.time;
     // }
     // else
     // {
@@ -26,10 +28,11 @@ onMounted(()=>{
     // {
     //     appState.value = JSON.parse(appstateSource);
     // }
-    // window.addEventListener('beforeunload', ()=>{
-    //     localStorage.setItem('appstate', JSON.stringify(appState.value))
-    //     localStorage.setItem('progress', JSON.stringify(progress));
-    // });
+    // loadText();
+    window.addEventListener('beforeunload', ()=>{
+        localStorage.setItem('appstate', JSON.stringify(appState.value))
+        localStorage.setItem('progress', JSON.stringify(progress));
+    });
     createUser(0);
     createUser(0);
     createUser(0);
@@ -67,6 +70,7 @@ onMounted(()=>{
             prompt: ""
         }
     );
+    finishRound();
 });
 
 export interface AppState {
@@ -74,7 +78,7 @@ export interface AppState {
     editingUser: number;
     uncollectedMessages: Record<number,Array<number>>;
     flows: Array<Array<number>>;
-    messageStatistic: Record<number, {views:number,likes:number}>
+    messageStatistic: Array<{msg:number,views:number,likes:number,exposure:number,score:number}>;
 }
 
 const appState:Ref<AppState> = ref({
@@ -83,7 +87,7 @@ const appState:Ref<AppState> = ref({
     uncollectedMessages:{},
     collectedMessages:[],
     flows:[[]],
-    messageStatistic:{}
+    messageStatistic:[]
 });
 
 const showUserEditor = ref(false);
@@ -139,16 +143,16 @@ subscribe('userPressed', (id)=>
 })
 
 subscribe('addedMessage', (msg:Message)=>{
-    if (!(msg.i in appState.value.uncollectedMessages))
+    if (!(msg.a in appState.value.uncollectedMessages))
     {
-        appState.value.uncollectedMessages[msg.i] = [];
+        appState.value.uncollectedMessages[msg.a] = [];
     }
-    appState.value.uncollectedMessages[msg.i].push(msg.id);
+    appState.value.uncollectedMessages[msg.a].push(msg.id);
 });
 
 function forgetMsg(msg:Message)
 {
-    appState.value.uncollectedMessages[msg.i] = appState.value.uncollectedMessages[msg.i].filter(m=>m!=msg.id);
+    appState.value.uncollectedMessages[msg.a] = appState.value.uncollectedMessages[msg.a].filter(m=>m!=msg.id);
 }
 function collectMsg(msg:Message)
 {
@@ -158,6 +162,7 @@ function collectMsg(msg:Message)
 function finishRound()
 {
     progress.time += 1;
+    gameTime.value = progress.time;
     appState.value.uncollectedMessages = {};
     for(let flow=0;flow<appState.value.flows.length;flow++)
     {
@@ -165,7 +170,11 @@ function finishRound()
         appState.value.flows[flow] = [];
     }
     updateUsers();
-    if (Object.keys(appState.value.messageStatistic).length>0) showStatistic.value = true;
+    if (appState.value.messageStatistic.length>0)
+    {
+        appState.value.messageStatistic = appState.value.messageStatistic.sort((s1,s2)=>s2.exposure-s1.exposure);
+        showStatistic.value = true;
+    }
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
@@ -191,43 +200,81 @@ const windowWidth = ref(0);
 //     flowsPageCount.value = Math.ceil(newValue.length/flowsPageSize);
 //     flowsPage.value = flowsPageCount.value;
 // });
+function checkoutMessageStatistic(msgId:number)
+{
+    for (let i=0;i<appState.value.messageStatistic.length;i++)
+    {
+        if (appState.value.messageStatistic[i].msg == msgId) return i;
+    }
+    appState.value.messageStatistic.push({msg:msgId,views:0,likes:0,exposure:0,score:0});
+    return appState.value.messageStatistic.length-1;
+}
 subscribe('viewedMessage',(msgId,view)=>{
-    if(!(msgId in appState.value.messageStatistic)) appState.value.messageStatistic[msgId] = {views:0,likes:0};
-    appState.value.messageStatistic[msgId].views += view;
+    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].views = view;
 })
 subscribe('likedMessage',(msgId,like)=>{
-    if(!(msgId in appState.value.messageStatistic)) appState.value.messageStatistic[msgId] = {views:0,likes:0};
-    appState.value.messageStatistic[msgId].likes += like;
+    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].likes = like;
+})
+subscribe('messageKnownExposure',(msgId,exposure)=>{
+    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].exposure = exposure;
+})
+subscribe('messageGainedScore',(msgId,score)=>{
+    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].score = score;
+    progress.score += score;
+    gameScore.value = progress.score;
+    roundScore += score;
 })
 const showStatistic = ref(false);
+let roundScore = 0;
+const gameScore = ref(0);
+const gameTime = ref(0);
 </script>
 
 <template>
 <div class="app">
     <!-- <p v-for="flow,flowId in appState.flows" :key="flowId">{{ flowId }}</p> -->
     <GameCanvas :app-state="appState" ref="canvas"/>
-    <n-modal v-model:show="showStatistic" preset="card" style="width: 600px;" title="统计数据" size="huge" :bordered="false"
-        @update-show="(show)=>{if(!show)appState.messageStatistic={}}"
+    <n-modal v-model:show="showStatistic" preset="card" style="width: 600px;" :title="`第${progress.time}回合统计`" size="huge" :bordered="false"
+        @update-show="(show)=>{if(!show){appState.messageStatistic=[];roundScore=0;}}"
     >
-        <MessageCard v-for="(statistic, msg) in appState.messageStatistic" :key=msg :msg="progress.messages[msg]">
+        <center>
+            <h3>总得分</h3>
+            <h1><n-number-animation :to="Math.floor(roundScore)"/></h1>
+        </center>
+        <MessageCard v-for="statistic in appState.messageStatistic" :key=statistic.msg :msg="progress.messages[statistic.msg]">
             <template #suffix>
                 <n-row>
                     <n-col :span="12">
-                        <n-icon><View/></n-icon>
-                        <n-number-animation :from="0" :to="statistic.views"/>
+                        <n-statistic label="浏览" :value="statistic.views.toFixed(3)">
+                            <template #prefix><n-icon><View/></n-icon></template>
+                            <template #suffix>K</template>
+                        </n-statistic>
                     </n-col>
                     <n-col :span="12">
-                        <n-icon><ThumbsUp/></n-icon>
-                        <n-number-animation :from="0" :to="statistic.likes"/>
+                        <n-statistic label="点赞" :value="(statistic.likes*(Math.abs(Math.random()-0.8)+0.8)).toFixed(3)">
+                            <template #prefix><n-icon><ThumbsUp/></n-icon></template>
+                            <template #suffix>K</template>
+                        </n-statistic>
+                    </n-col>
+                    <n-col :span="12">
+                        <n-statistic label="曝光倍率" :value="statistic.exposure">
+                            <template #prefix><n-icon><AnalyticsReference/></n-icon></template>
+                            <template #suffix>x</template>
+                        </n-statistic>
+                    </n-col>
+                    <n-col :span="12">
+                        <n-statistic label="得分" :value="statistic.score.toFixed()">
+                            <template #prefix><n-icon><AiResultsHigh/></n-icon></template>
+                        </n-statistic>
                     </n-col>
                 </n-row>
             </template>
         </MessageCard>
     </n-modal>
-    <n-drawer v-model:show="showFlowsEditor" :width="windowWidth>800?800:windowWidth" :placement="'left'">
+    <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
         <n-drawer-content>
             <div class="flows">
-                <n-flex style="flex-grow: 1;overflow-y: scroll;overflow-x: hidden;">
+                <n-flex class="noscroll" style="flex-grow: 1;overflow-y:scroll;">
                     <MessageFlow v-for="i,flow in appState.flows.length" :key="flow" v-model:label="text.flowLabel[flow]" v-model:source="appState.flows[flow]" :flow="flow"/>
                     <NCard class="flowControl">
                         <n-flex vertical>
@@ -236,7 +283,8 @@ const showStatistic = ref(false);
                         </n-flex>
                     </NCard>
                 </n-flex>
-                <!-- <n-pagination v-model:page="flowsPage" :page-count="flowsPageCount"/> -->
+                <div style="border-top: 1px solid gainsboro; height: 8px;"></div>
+                <n-page-header subtitle="推送流" @back="showFlowsEditor=false"></n-page-header>
             </div>
         </n-drawer-content>
     </n-drawer>
@@ -247,7 +295,7 @@ const showStatistic = ref(false);
         }}">
             <n-drawer-content :native-scrollbar="false">
                 <template #header>
-                    <NPageHeader subtitle="用户分析" @back="showUserEditor=false"></NPageHeader>
+                    <n-page-header subtitle="用户分析" @back="showUserEditor=false"></n-page-header>
                     <h1>#{{ getUserName(appState.editingUser) }}</h1>
                 </template>
                 <p>
@@ -283,11 +331,16 @@ const showStatistic = ref(false);
                 </n-tabs>
             </n-drawer-content>
         </n-drawer>
-        <div class="corner-buttons corner-buttons-rb">
-            <n-button round type="primary" size="large" @click="finishRound">结束回合</n-button>
-        </div>
-        <div class="corner-buttons corner-buttons-lb">
-            <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button>
+        <div class="pagebottom">
+            <div class="buttons">
+                <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button>
+            </div>
+            <div class="score">
+                <n-icon><Time/></n-icon> {{ gameTime }} <n-icon><Network1/></n-icon> <n-number-animation :to="gameScore"/>
+            </div>
+            <div class="buttons">
+                <n-button round type="primary" size="large" @click="finishRound">结束回合</n-button>
+            </div>
         </div>
 </div>
 </template>
@@ -305,22 +358,11 @@ body
     width: 100vw;
     height: 100vh;
 }
-.corner-buttons
+.buttons
 {
-    position: absolute;
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-.corner-buttons-lb
-{
-    left: 20px;
-    bottom: 20px;
-}
-.corner-buttons-rb
-{
-    right: 20px;
-    bottom: 20px;
 }
 @media (max-width: 500px) {
     .user-editor-container {
@@ -333,6 +375,9 @@ body
     height: 100%;
     display: flex;
     flex-direction: column;
+}
+.noscroll::-webkit-scrollbar {
+    display: none;
 }
 .flow
 {
@@ -352,5 +397,26 @@ body
     height: min-content;
     display: flex;
     flex-direction: column;
+}
+.pagebottom
+{
+    display:flex;
+    position:absolute;
+    height:40px;
+    justify-content:space-between;
+    bottom:20px;
+    left:20px;
+    right:20px;
+}
+.score
+{
+    background: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    border-radius: 8px;
+    color:black;
+    padding: 8px;
+    text-wrap-mode: nowrap;
+    text-align: center;
+    font-weight: bold;
 }
 </style>

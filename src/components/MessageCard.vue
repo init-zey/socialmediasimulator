@@ -4,9 +4,12 @@
         <n-skeleton v-if="title==''" :width="100" round />
         <div v-else>
             <h3><n-ellipsis :line-clamp="2">{{ title }}</n-ellipsis></h3>
-            <p>{{ getUserName(msg.i) }} 发布于 {{msg.t}}</p>
         </div>
     </template>
+    <template #header-extra>
+        <slot name="header-extra"></slot>
+    </template>
+    <div class="author">{{ getUserName(msg.a) }} 发布于 {{msg.t}}</div>
     <n-skeleton v-if="content==''" text :repeat="2"/>
     <div v-else>
         <p><n-ellipsis :line-clamp="2">{{ content }}</n-ellipsis></p>
@@ -46,5 +49,9 @@ const intervalId = setInterval(()=>{
     margin-top: 20px;
     padding: 10px;
     box-shadow:0px 0px 3px 0px rgba(0,0,0,0.5);
+}
+.author
+{
+    font-size: 16px;
 }
 </style>

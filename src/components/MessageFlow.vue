@@ -1,5 +1,5 @@
 <template>
-    <n-card class="flow">
+    <n-card class="flow noscroll">
         <center>
             <n-tag v-if="flow==0">主推送流</n-tag>
             <n-input v-else v-model:value="label" size="small" type="text" placeholder="自定义推送流"/>
@@ -14,8 +14,8 @@
         <template #item="element">
             <div>
                 <MessageCard :msg="progress.messages[element.element]">
-                    <template #action>
-                        <n-button @click="source=source?.filter(m=>m!=element.element)">移除</n-button>
+                    <template #header-extra>
+                        <b>{{ (source?.length??0) - element.index }}x</b>
                     </template>
                 </MessageCard>
             </div>

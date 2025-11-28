@@ -93,7 +93,7 @@ function changeAttitude(user:number, target:number, d:number):number
   const graph = getSubjectUserGraph(user);
   const value=rGetIn(user,target,graph)+d;
   rSetIn(user,target,value,graph);
-  if (Math.abs(d)>0.5) createMessage(user,target,value);
+  if (Math.abs(d)>0.2) createMessage(user,target,value);
   return d;
 }
 
@@ -114,9 +114,8 @@ function updateUser(user:number)
   }
   if(maxIPD_o>=0)
     {
-      maxIPD = Math.atan(maxIPD);
       console.log(`maxIPD=${maxIPD},maxIPD_o=${maxIPD_o}`);
-      changeAttitude(user, maxIPD_o, -1/maxIPD);
+      changeAttitude(user, maxIPD_o, -Math.atan(maxIPD)/3.14);
   }
 }
 

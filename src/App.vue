@@ -32,41 +32,38 @@ onMounted(()=>{
     // });
     createUser(0);
     createUser(0);
-    createUser(1);
-    createUser(1);
+    createUser(0);
+    createUser(0);
     for(let p=0;p<progress.userCount;p++)
     {
         const G = getSubjectUserGraph(p);
-        for(let x=0;x<progress.userCount;x++)
+        // for(let x=0;x<4;x++)
+        // {
+        //     for(let o=0;o<4;o++)
+        //     {
+        //         rSetIn(x,o,1,G);
+        //     }
+        // }
+        for(let x=0;x<4;x++)
         {
-            for(let o=x;o<progress.userCount;o++)
-            {
-                if (x==p)
-                {
-                    rSetIn(x,o,1,G);
-                }
-                else
-                {
-                    rSetIn(x,o,-1,G);
-                }
-            }
+            rSetIn(p,x,(Math.random()*2-1)*2,G);
         }
     }
     text.userTexts.push(
         {
-            name: "学生",
+            name: "A",
             prompt: ""
         },
         {
-            name: "丘",
+            name: "B",
             prompt: ""
         },
         {
-            name: "人品",
+            name: "C",
             prompt: ""
         },
         {
-            name: "数学",
+            name: "D",
             prompt: ""
         }
     );
@@ -168,7 +165,7 @@ function finishRound()
         appState.value.flows[flow] = [];
     }
     updateUsers();
-    showStatistic.value = true;
+    if (Object.keys(appState.value.messageStatistic).length>0) showStatistic.value = true;
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {

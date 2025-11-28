@@ -110,16 +110,19 @@ export async function processGenerateQueue()
     // const content = await chat(getMessageContentPrompt(progress.messages[msg]));
     // const title = await chat(getMessageTitlePrompt(content));
     const msgObj = progress.messages[msg];
-    let describe = '不感兴趣'
-    if (msgObj.v>0.5) describe='认同';
-    if (msgObj.v<-0.5) describe='反对';
-    const content = `我对${getUserName(msgObj.j)}${describe}。`;
-    const title = "消息"+msg.toString();
-    const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
-    text.messageTexts[msg] = {title, content, minimumVersion}
-    localStorage.setItem('text', JSON.stringify(text));
-    emit("generatedMessage", msg, title, content);
-    text.generateQueue.shift();
+    if(msgObj!=undefined)
+    {
+        let describe = '不感兴趣'
+        if (msgObj.v>0.5) describe='认同';
+        if (msgObj.v<-0.5) describe='反对';
+        const content = `我对${getUserName(msgObj.j)}${describe}。`;
+        const title = "消息"+msg.toString();
+        const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
+        text.messageTexts[msg] = {title, content, minimumVersion}
+        localStorage.setItem('text', JSON.stringify(text));
+        emit("generatedMessage", msg, title, content);
+        text.generateQueue.shift();
+    }
     generating = false;
     console.log("消息生成完毕");
 }

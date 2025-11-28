@@ -318,24 +318,34 @@ function redraw()
     }
     else
     {
-        for (const fromId in progress.subjectiveUserGraph)
+        for (const fromIdStr in progress.subjectiveUserGraph)
         {
+            const fromId = parseInt(fromIdStr);
             const from = state.value.users[fromId];
-            Object.entries(progress.subjectiveUserGraph[fromId]).forEach(([k,r])=>{
+            Object.entries(progress.subjectiveUserGraph[fromId]).forEach(([k,rFT])=>{
                 const splited = k.split('_');
                 const keyFrom = splited[0];
                 if (keyFrom != (fromId.toString())) return;
                 const toId = parseInt(splited[1],32);
                 const to = state.value.users[toId];
-                let a = Math.abs(r);
-                if (a > 1) a = 1;
-                if (a < 0) return;
-                const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
-                // const style = `#000`;
-                linesCtx.strokeStyle = style;
+                let aFT = Math.abs(rFT);
+                if (aFT > 1) aFT = 1;
+                const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
+                const rTF = rGetIn(fromId, toId, getSubjectUserGraph(toId));
+                let aTF = Math.abs(rTF);
+                if (aTF > 1) aTF = 1;
+                const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
+                const x1 = (from.x+x.value)*s.value;
+                const y1 = (from.y+y.value)*s.value;
+                const x2 = (to.x+x.value)*s.value;
+                const y2 = (to.y+y.value)*s.value;
+                const grd=linesCtx.createLinearGradient(x1, y1, x2, y2);
+                grd.addColorStop(0,styleFT);
+                grd.addColorStop(1,styleTF);
+                linesCtx.strokeStyle = grd;
                 linesCtx.beginPath();
-                linesCtx.moveTo((from.x+x.value)*s.value, (from.y+y.value)*s.value);
-                linesCtx.lineTo((to.x+x.value)*s.value, (to.y+y.value)*s.value);
+                linesCtx.moveTo(x1, y1);
+                linesCtx.lineTo(x2, y2);
                 linesCtx.stroke();
             })
         }

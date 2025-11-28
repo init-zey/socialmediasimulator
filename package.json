@@ -15,7 +15,8 @@
     "node-polyfill-webpack-plugin": "^4.1.0",
     "openai": "^6.9.1",
     "vue": "^3.2.13",
-    "vue-class-component": "^8.0.0-0"
+    "vue-class-component": "^8.0.0-0",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",

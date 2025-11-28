@@ -5,7 +5,7 @@
     <CanvasUser v-for="user in state.users" :key="user.id"
     :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="state.selectedUsers.includes(user.id)" :focused="state.focusedUser==user.id"
     :badge-default="(user.id in appState.uncollectedMessages)?appState.uncollectedMessages[user.id].length:0"
-    :badge-info="(user.id in appState.readyToPushMessages)?appState.readyToPushMessages[user.id].length:0"
+    :badge-info="0"
     />
     <canvas id="lines"/>
 </div>

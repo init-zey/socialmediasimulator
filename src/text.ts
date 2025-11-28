@@ -1,4 +1,3 @@
-import { ref, Ref } from "vue"
 import { emit } from "./event"
 import { Message, progress } from "./game"
 import { chat } from "./llm"
@@ -13,20 +12,22 @@ export interface MessageText {
     minimumVersion: string
 }
 
-export let text:{
+export const text:{
     userTexts:Array<UserText>,
     messageTexts:Array<MessageText>,
-    generateQueue:Array<number>
+    generateQueue:Array<number>,
+    flowLabel:Array<string>
 }={
     userTexts: [],
     messageTexts: [],
-    generateQueue: []
+    generateQueue: [],
+    flowLabel: ['主推送流']
 }
 
 const textSource = localStorage.getItem('text');
 if (textSource != null)
 {
-    text = JSON.parse(textSource);
+    // text = JSON.parse(textSource);
 }
 
 function getUserText(id:number):UserText
@@ -94,9 +95,10 @@ let generating = false;
 export async function processGenerateQueue()
 {
     if (generating || text.generateQueue == undefined || text.generateQueue.length==0) return;
+    const msg = text.generateQueue[0];
+    if (msg==undefined) return;
     console.log("生成新消息");
     generating = true;
-    const msg = text.generateQueue[0];
     if (text.messageTexts.length - 1 < msg)
     {
         text.messageTexts.push({

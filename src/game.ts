@@ -28,9 +28,25 @@ export let progress:Progress = {
   score: 0
 }
 
+export function resetProgress()
+{
+  progress = {
+    userMemory: {},
+    subjectiveUserGraph: {},
+    messages: [],
+    userType: [],
+    userLearnRate: [],
+    userCount: 0,
+    userFlowTags: [],
+    time: 0,
+    score: 0
+  };
+  emit("resetProgress");
+}
+
 export function setProgress(newProgress:Progress)
 {
-  emit("resetProgress");
+  resetProgress();
   progress = newProgress;
   for(let i=0;i<progress.userCount;i++)
   {

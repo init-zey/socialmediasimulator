@@ -33,6 +33,16 @@ export function loadText()
     }
 }
 
+export function resetText()
+{
+    text = {
+        userTexts: [],
+        messageTexts: [],
+        generateQueue: [],
+        flowLabel: ['主推送流']
+    }
+}
+
 function getUserText(id:number):UserText
 {
     if (id >= 0 && id < text.userTexts.length) return text.userTexts[id];

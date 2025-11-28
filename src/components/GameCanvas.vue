@@ -4,7 +4,7 @@
     <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel"></div>
     <CanvasUser v-for="user in state.users" :key="user.id"
     :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="state.selectedUsers.includes(user.id)" :focused="state.focusedUser==user.id"
-    :badge-default="(user.id in appState.uncollectedMessages)?appState.uncollectedMessages[user.id].length:0"
+    :badge-default="((user.id in (appState?.uncollectedMessages??{}))?appState?.uncollectedMessages[user.id].length:0)??0"
     :badge-info="0"
     />
     <canvas id="lines"/>
@@ -13,7 +13,7 @@
 
 <script setup lang="ts">
 import { debugMode, getRepulsion, getSubjectUserGraph, progress, rGetIn } from '../game'
-import { defineProps, onMounted, Ref, ref } from 'vue'
+import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { subscribe } from '../event'
 import { AppState } from '@/App.vue';
@@ -34,14 +34,22 @@ const state:Ref<{
   focusedUser: -1
 })
 
-const props = defineProps<{appState:AppState}>();
+subscribe('resetProgress',()=>{
+    state.value = {
+        users: [],
+        selectedUsers: [],
+        focusedUser: -1
+    };
+})
+
+const appState = defineModel<AppState>();
 
 const x = ref(0);
 const y = ref(0);
 const s = ref(1);
 subscribe('userPressed', (id)=>
 {
-    if (props.appState.mode == 'user-edit') return;
+    if (appState.value?.mode == 'user-edit') return;
     let selectedUsers = state.value.selectedUsers;
     if (selectedUsers.includes(id))
     {
@@ -283,11 +291,12 @@ function physicsProcess()
 
 function redraw()
 {
+    if (appState.value==undefined) return;
     linesCanvas.width = window.innerWidth;
     linesCanvas.height = window.innerHeight;
-    if (props.appState.editingUser >= 0)
+    if (appState.value.editingUser >= 0)
     {
-        const graph = getSubjectUserGraph(props.appState.editingUser);
+        const graph = getSubjectUserGraph(appState.value.editingUser);
         Object.entries(graph).forEach(([k,r])=>{
             const splited = k.split('_');
             const fromId = parseInt(splited[0],32);
@@ -322,6 +331,7 @@ function redraw()
         {
             const fromId = parseInt(fromIdStr);
             const from = state.value.users[fromId];
+            if (from==undefined) continue;
             Object.entries(progress.subjectiveUserGraph[fromId]).forEach(([k,rFT])=>{
                 const splited = k.split('_');
                 const keyFrom = splited[0];

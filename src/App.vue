@@ -3,10 +3,10 @@ import { computed, nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
-import { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress } from './game';
+import { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress, resetProgress } from './game';
 import { subscribe } from './event';
 import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
-import { getUserName, loadText, processGenerateQueue, text } from './text';
+import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import MessageFlow from './components/MessageFlow.vue';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
@@ -33,44 +33,7 @@ onMounted(()=>{
         localStorage.setItem('appstate', JSON.stringify(appState.value))
         localStorage.setItem('progress', JSON.stringify(progress));
     });
-    createUser(0);
-    createUser(0);
-    createUser(0);
-    createUser(0);
-    for(let p=0;p<progress.userCount;p++)
-    {
-        const G = getSubjectUserGraph(p);
-        // for(let x=0;x<4;x++)
-        // {
-        //     for(let o=0;o<4;o++)
-        //     {
-        //         rSetIn(x,o,1,G);
-        //     }
-        // }
-        for(let x=0;x<4;x++)
-        {
-            rSetIn(p,x,(Math.random()*2-1)*2,G);
-        }
-    }
-    text.userTexts.push(
-        {
-            name: "A",
-            prompt: ""
-        },
-        {
-            name: "B",
-            prompt: ""
-        },
-        {
-            name: "C",
-            prompt: ""
-        },
-        {
-            name: "D",
-            prompt: ""
-        }
-    );
-    finishRound();
+    gameInit();
 });
 
 export interface AppState {
@@ -85,7 +48,6 @@ const appState:Ref<AppState> = ref({
     mode:'user-edit',
     editingUser:-1,
     uncollectedMessages:{},
-    collectedMessages:[],
     flows:[[]],
     messageStatistic:[]
 });
@@ -170,7 +132,11 @@ function finishRound()
         appState.value.flows[flow] = [];
     }
     updateUsers();
-    if (appState.value.messageStatistic.length>0)
+    if (Object.keys (appState.value.uncollectedMessages).length==0)
+    {
+        gameEnded.value = true;
+    }
+    else if (appState.value.messageStatistic.length>0)
     {
         appState.value.messageStatistic = appState.value.messageStatistic.sort((s1,s2)=>s2.exposure-s1.exposure);
         showStatistic.value = true;
@@ -184,22 +150,6 @@ setInterval(() => {
     windowWidth.value = window.innerWidth;
 }, 1);
 const windowWidth = ref(0);
-// const flowsPage = ref(1);
-// const flowsPageSize = 3;
-// function getFlowPage()
-// {
-//     let arr = [];
-//     for(let i=0;i<(Math.min(flowsPage.value*flowsPageSize,appState.value.flows.length)-1)%(flowsPageSize)+1;i++)
-//     {
-//         arr.push((flowsPage.value-1) * flowsPageSize + i);
-//     }
-//     return arr;
-// }
-// const flowsPageCount = ref(1);
-// watch(appState.value.flows, (newValue)=>{
-//     flowsPageCount.value = Math.ceil(newValue.length/flowsPageSize);
-//     flowsPage.value = flowsPageCount.value;
-// });
 function checkoutMessageStatistic(msgId:number)
 {
     for (let i=0;i<appState.value.messageStatistic.length;i++)
@@ -228,12 +178,67 @@ const showStatistic = ref(false);
 let roundScore = 0;
 const gameScore = ref(0);
 const gameTime = ref(0);
+const gameEnded = ref(false);
+subscribe('resetProgress', ()=>{
+    appState.value={
+        mode:'user-edit',
+        editingUser:-1,
+        uncollectedMessages:{},
+        flows:[[]],
+        messageStatistic:[]
+    };
+    gameTime.value = 0;
+    gameScore.value = 0;
+    resetText();
+    gameInit();
+});
+function gameInit()
+{
+    createUser(0);
+    createUser(0);
+    createUser(0);
+    createUser(0);
+    for(let p=0;p<progress.userCount;p++)
+    {
+        const G = getSubjectUserGraph(p);
+        // for(let x=0;x<4;x++)
+        // {
+        //     for(let o=0;o<4;o++)
+        //     {
+        //         rSetIn(x,o,1,G);
+        //     }
+        // }
+        for(let x=0;x<4;x++)
+        {
+            rSetIn(p,x,(Math.random()*2-1)*2,G);
+        }
+    }
+    text.userTexts.push(
+        {
+            name: "A",
+            prompt: ""
+        },
+        {
+            name: "B",
+            prompt: ""
+        },
+        {
+            name: "C",
+            prompt: ""
+        },
+        {
+            name: "D",
+            prompt: ""
+        }
+    );
+    finishRound();
+}
 </script>
 
 <template>
 <div class="app">
     <!-- <p v-for="flow,flowId in appState.flows" :key="flowId">{{ flowId }}</p> -->
-    <GameCanvas :app-state="appState" ref="canvas"/>
+    <GameCanvas v-model="appState" ref="canvas"/>
     <n-modal v-model:show="showStatistic" preset="card" style="width: 600px;" :title="`第${progress.time}回合统计`" size="huge" :bordered="false"
         @update-show="(show)=>{if(!show){appState.messageStatistic=[];roundScore=0;}}"
     >
@@ -342,6 +347,10 @@ const gameTime = ref(0);
                 <n-button round type="primary" size="large" @click="finishRound">结束回合</n-button>
             </div>
         </div>
+        <n-modal v-model:show="gameEnded" preset="card" style="width: 600px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
+            <p>你的网络在第<b>{{ gameTime }}</b>回合安静下来了，你的得分是<b>{{ gameScore }}</b>。</p>
+            <center><n-button @click="gameEnded=false;resetProgress()">重新开始</n-button></center>
+        </n-modal>
 </div>
 </template>
 

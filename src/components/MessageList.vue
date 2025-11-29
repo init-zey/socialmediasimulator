@@ -1,55 +1,19 @@
 <template>
-<n-data-table
-    v-model:checked-row-keys="checkedRowKeys"
-    :columns="columns"
-    :data="source"
-    :pagination="false"
-    :bordered="false"
-    :row-key="(msg:Message)=>msg.id"
-striped />
+<n-card class="flow" :content-style="'display:flex;flex-direction:column;height:100%;padding:0;'">
+  <slot name="prefix"></slot>
+  <div style="overflow:scroll;margin:20px;flex-grow:1;" class="noscroll">
+    <MessageCard v-for="msg in source" :msg="msg"/>
+  </div>
+  <slot name="suffix"></slot>
+</n-card>
 </template>
 
 <script setup lang="ts">
-import { Message, progress } from '@/game';
-import { DataTableColumns } from 'naive-ui';
-import { defineProps, defineModel } from 'vue';
-import { NDataTable } from 'naive-ui';
-const props = defineProps<{source:Array<Message>,filter:(msg:Message)=>boolean,select:boolean}>();
-
-const checkedRowKeys=defineModel<Array<number>>();
-
-function createColumns(): DataTableColumns<Message> {
-  return [
-    {
-      title: '创作群体',
-      key: 'i'
-    },
-    {
-      title: '时间',
-      key: 't'
-    },
-    {
-      title: '涉及群体',
-      key: 'j'
-    },
-    {
-      title: '态度',
-      key: 'v'
-    }
-  ]
-}
-
-let columns=createColumns();
-
-if (props.select)
-{
-  columns = [{
-    type: 'selection',
-    multiple: true,
-    disabled: (row)=>!props.filter(progress.messages[row.id])
-  }, ...columns]
-}
-
+import { Message } from '@/game';
+import { defineProps } from 'vue';
+import { NCard } from 'naive-ui';
+import MessageCard from './MessageCard.vue';
+defineProps<{source:Array<Message>}>();
 </script>
 
 <style scoped>

@@ -7,8 +7,8 @@ export interface UserText {
     prompt:string
 }
 export interface MessageText {
-    title: string,
     content: string,
+    time: string,
     minimumVersion: string
 }
 
@@ -93,11 +93,6 @@ function getMessageContentPrompt(msg:Message):string
 {
     return `扮演一名社交媒体用户虚构贴文。你的个性：${randomPick(traits)}。${getFullUserPrompt(msg.i)}要求1：长度1句话。要求2：站在${getUserText(msg.i).prompt}的视角表达你${getRelationshipDiffDescribe(msg.v,getUserText(msg.j).prompt)}。`;
 }
-
-function getMessageTitlePrompt(content:string):string
-{
-    return `[${content}]扮演作者，选择1个短语作为标题，不要出现任何标点符号。`;
-}
 function getMessageMinimumVersionPrompt(content:string):string
 {
     return `[${content}]一句话总结这篇社媒博文。`;
@@ -115,9 +110,9 @@ export async function processGenerateQueue()
     if (text.messageTexts.length - 1 < msg)
     {
         text.messageTexts.push({
-            title: "",
             content: "",
-            minimumVersion: ""
+            minimumVersion: "",
+            time:""
         });
     }
     // const content = await chat(getMessageContentPrompt(progress.messages[msg]));
@@ -126,14 +121,12 @@ export async function processGenerateQueue()
     if(msgObj!=undefined)
     {
         let describe = '不感兴趣'
-        if (msgObj.v>0.5) describe='认同';
-        if (msgObj.v<-0.5) describe='反对';
-        const content = `${getUserName(msgObj.i)}对${getUserName(msgObj.j)}${describe}。`;
-        const title = "消息"+msg.toString();
+        if (msgObj.v>0.1) describe='认同';
+        if (msgObj.v<-0.1) describe='反对';
+        const content = `${msgObj.i==msgObj.a?'我':getUserName(msgObj.i)}对${msgObj.j==msgObj.a?'我自己':getUserName(msgObj.j)}${describe}。`;
         const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
-        text.messageTexts[msg] = {title, content, minimumVersion}
-        localStorage.setItem('text', JSON.stringify(text));
-        emit("generatedMessage", msg, title, content);
+        text.messageTexts[msg] = {content, minimumVersion, time:getTimeText(msgObj.t)}
+        emit("generatedMessage", msg, content);
         text.generateQueue.shift();
     }
     generating = false;
@@ -142,9 +135,44 @@ export async function processGenerateQueue()
 
 export async function startGenerateMessage(msg:Message)
 {
-    if (text.generateQueue != undefined && (msg.id>=text.messageTexts.length || text.messageTexts[msg.id].title == ''))
+    if (text.generateQueue != undefined && (msg.id>=text.messageTexts.length || text.messageTexts[msg.id].content == ''))
     {
         text.generateQueue.push(msg.id);
     }
 }
 
+const weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+export function getTimeText(time:number)
+{
+    const day = time + 100;
+    const year = ((day / 365) + 22).toFixed();
+    const month = (day % 365 / 12).toFixed();
+    const weekday = day % 7;
+    return (Math.random()*12).toFixed()+':'+(Math.random()*60).toFixed()+' '+(Math.random()>0.5?'P':'A')+'M'+' • '+`${weekdays[weekday]} ${month}, ${year}`
+}
+
+export function getResponse(user:number, msg:Message, dInstability:number)
+{
+    const d = -dInstability;
+    if (d>0.2)
+    {
+        return "👍";
+    }
+    else if (d>0.4)
+    {
+        return "🤣";
+    }
+    else if (d<-0.2)
+    {
+        return "😡";
+    }
+    else if (d<-0.4)
+    {
+        return "😅";
+    }
+    else
+    {
+        return "👀";
+    }
+}

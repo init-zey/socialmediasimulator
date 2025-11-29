@@ -3,19 +3,17 @@
 :style="{'background-size': 20*s+'px '+20*s+'px', 'background-position': x*s+'px '+y*s+'px'}">
     <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel"></div>
     <CanvasUser v-for="user in state.users" :key="user.id"
-    :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="state.selectedUsers.includes(user.id)" :focused="state.focusedUser==user.id"
-    :badge-default="((user.id in (appState?.uncollectedMessages??{}))?appState?.uncollectedMessages[user.id].length:0)??0"
-    :badge-info="0"
+    :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
     />
     <canvas id="lines"/>
 </div>
 </template>
 
 <script setup lang="ts">
-import { debugMode, getRepulsion, getSubjectUserGraph, progress, rGetIn } from '../game'
+import { debugMode, getRepulsion, progress, rGet } from '../game'
 import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
-import { subscribe } from '../event'
+import { emit, subscribe } from '../event'
 import { AppState } from '@/App.vue';
 type User = {
     id: number;
@@ -25,20 +23,14 @@ type User = {
     vy: number;
 };
 const state:Ref<{
-    users: Array<User>,
-    selectedUsers: Array<number>
-    focusedUser: number
+    users: Array<User>
 }> = ref({
   users: [],
-  selectedUsers: [],
-  focusedUser: -1
 })
 
 subscribe('resetProgress',()=>{
     state.value = {
-        users: [],
-        selectedUsers: [],
-        focusedUser: -1
+        users: []
     };
 })
 
@@ -49,23 +41,53 @@ const y = ref(0);
 const s = ref(1);
 subscribe('userPressed', (id)=>
 {
-    if (appState.value?.mode == 'user-edit') return;
-    let selectedUsers = state.value.selectedUsers;
-    if (selectedUsers.includes(id))
+    // if (appState.value?.mode == 'user-edit') return;
+    if (appState.value == undefined) return;
+    let selectedUsers = appState.value.selectedUsers;
+    if (appState.value?.mode == 'select-relationship')
     {
-        if (state.value.focusedUser != id)
+        if (selectedUsers.includes(id))
         {
-            state.value.focusedUser = id;
+            if (appState.value.focusedUser != id)
+            {
+                appState.value.focusedUser = id;
+            }
+            else
+            {
+                appState.value.selectedUsers = selectedUsers.filter(i=>i!=id);
+                appState.value.focusedUser = -1;
+            }
+        }
+        else{
+            appState.value.focusedUser = id;
+            selectedUsers.push(id);
+            if (selectedUsers.length==2)
+            {
+                const i=selectedUsers[0];
+                const j=selectedUsers[1];
+                if(appState.value.focusedUser==i)
+                {
+                    emit('relationSelected',i,j);
+                }
+                else
+                {
+                    emit('relationSelected',j,i);
+                }
+                appState.value.focusedUser = -1;
+                appState.value.selectedUsers = [];
+            }
+        }
+    }
+    else
+    {
+        if (selectedUsers.includes(id))
+        {
+            appState.value.selectedUsers = selectedUsers.filter(i=>i!=id);
         }
         else
         {
-            state.value.selectedUsers = selectedUsers.filter(i=>i!=id);
-            state.value.focusedUser = -1;
+            appState.value.selectedUsers.push(id);
         }
-    }
-    else{
-        state.value.focusedUser = id;
-        selectedUsers.push(id);
     }
 })
 
@@ -150,14 +172,14 @@ function onMousemove(e:any)
     }
     mouseX = e.clientX;
     mouseY = e.clientY;
-    multiSelecting = e.buttons==1;
+    multiSelecting = appState.value?.mode=="broadcast" && e.buttons==1;
 }
 
 function onMousedown(e:any)
 {
     if (e.buttons==1)
     {
-        multiSelecting = true;
+        multiSelecting = appState.value?.mode=="broadcast";
         multiSelectStartX=e.clientX;
         multiSelectStartY=e.clientY;
     }
@@ -169,18 +191,20 @@ let bgDownButtons = 0;
 
 function onMouseup(e:any)
 {
+    if (appState.value == undefined) return;
     if (bgDownButtons == 1)
     {
-        state.value.selectedUsers = [];
-        state.value.focusedUser = -1;
+        appState.value.selectedUsers = [];
+        appState.value.focusedUser = -1;
     }
     if (multiSelecting && Math.abs(mouseX - multiSelectStartX) > 10 && Math.abs(mouseY - multiSelectStartY) > 10)
     {
-        state.value.selectedUsers = state.value.users.filter(user=>
+        appState.value.selectedUsers = state.value.users.filter(user=>
         {
+            if (appState.value == undefined) return;
             const ux = (user.x + x.value) * s.value;
             const uy = (user.y + y.value) * s.value;
-            let newSelecteState = e.shiftKey?state.value.selectedUsers.includes(user.id):false;
+            let newSelecteState = e.shiftKey?appState.value.selectedUsers.includes(user.id):false;
             if (((ux > multiSelectStartX && ux < mouseX) || (ux > mouseX && ux < multiSelectStartX))
             && ((uy > multiSelectStartY && uy < mouseY) || (uy > mouseY && uy < multiSelectStartY)))
             {
@@ -259,6 +283,12 @@ onMounted(()=>{
     subscribe("removedUser", ()=>{
         state.value.users.pop();
     });
+    subscribe("tryGetBroadcastCollectedMessageTargets", ()=>{
+        if (appState.value == undefined) return;
+        emit('getBroadcastCollectedMessageTargets',appState.value.selectedUsers);
+        appState.value.selectedUsers = [];
+        appState.value.focusedUser = -1;
+    })
 });
 
 function physicsProcess()
@@ -294,70 +324,36 @@ function redraw()
     if (appState.value==undefined) return;
     linesCanvas.width = window.innerWidth;
     linesCanvas.height = window.innerHeight;
-    if (appState.value.editingUser >= 0)
+    for (let fromId=0;fromId<progress.userCount;fromId++)
     {
-        const graph = getSubjectUserGraph(appState.value.editingUser);
-        Object.entries(graph).forEach(([k,r])=>{
-            const splited = k.split('_');
-            const fromId = parseInt(splited[0],32);
-            const toId = parseInt(splited[1],32);
-            const from = state.value.users[fromId];
+        const from = state.value.users[fromId];
+        if (from==undefined) continue;
+        for (let toId=fromId+1;toId<progress.userCount;toId++){
             const to = state.value.users[toId];
-            let a = Math.abs(r);
-            if (a > 1) a = 1;
-            if (a < 0) return;
+            const rFT = rGet(fromId, toId);
+            const rTF = rGet(fromId, toId);
+            let aFT = Math.abs(rFT);
+            if (aFT > 1) aFT = 1;
+            if (aFT < 0) aFT = 0;
+            // if (aFT > 0.2) {aFT = 1} else {aFT=0}
+            const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
+            let aTF = Math.abs(rTF);
+            if (aTF > 1) aTF = 1;
+            if (aTF < 0) aTF = 0;
+            // if (aTF > 0.2) {aTF = 1} else {aTF=0}
+            const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
             const x1 = (from.x+x.value)*s.value;
             const y1 = (from.y+y.value)*s.value;
             const x2 = (to.x+x.value)*s.value;
             const y2 = (to.y+y.value)*s.value;
-            if (debugMode)
-            {
-                linesCtx.strokeStyle = '#000';
-                linesCtx.font = "16px Arial";
-                linesCtx.fillText(r.toFixed(2).toString(), (x1+x2)*0.5, (y1+y2)*0.5);
-            }
-            const style = `#${(r<0)?'ff':'00'}00${(r>=0)?'ff':'00'}${Math.floor(a*255).toString(16).padStart(2,'0')}`;
-            // const style = `#000`;
-            linesCtx.strokeStyle = style;
+            const grd=linesCtx.createLinearGradient(x1, y1, x2, y2);
+            grd.addColorStop(0,styleFT);
+            grd.addColorStop(1,styleTF);
+            linesCtx.strokeStyle = grd;
             linesCtx.beginPath();
             linesCtx.moveTo(x1, y1);
             linesCtx.lineTo(x2, y2);
             linesCtx.stroke();
-        });
-    }
-    else
-    {
-        for (const fromIdStr in progress.subjectiveUserGraph)
-        {
-            const fromId = parseInt(fromIdStr);
-            const from = state.value.users[fromId];
-            if (from==undefined) continue;
-            Object.entries(progress.subjectiveUserGraph[fromId]).forEach(([k,rFT])=>{
-                const splited = k.split('_');
-                const keyFrom = splited[0];
-                if (keyFrom != (fromId.toString())) return;
-                const toId = parseInt(splited[1],32);
-                const to = state.value.users[toId];
-                let aFT = Math.abs(rFT);
-                if (aFT > 0.5) {aFT = 1} else {aFT=0}
-                const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
-                const rTF = rGetIn(fromId, toId, getSubjectUserGraph(toId));
-                let aTF = Math.abs(rTF);
-                if (aTF > 0.5) {aTF = 1} else {aTF=0}
-                const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
-                const x1 = (from.x+x.value)*s.value;
-                const y1 = (from.y+y.value)*s.value;
-                const x2 = (to.x+x.value)*s.value;
-                const y2 = (to.y+y.value)*s.value;
-                const grd=linesCtx.createLinearGradient(x1, y1, x2, y2);
-                grd.addColorStop(0,styleFT);
-                grd.addColorStop(1,styleTF);
-                linesCtx.strokeStyle = grd;
-                linesCtx.beginPath();
-                linesCtx.moveTo(x1, y1);
-                linesCtx.lineTo(x2, y2);
-                linesCtx.stroke();
-            })
         }
     }
     // for(let i=0;i<progress.userCount;i++)

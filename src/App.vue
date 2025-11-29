@@ -1,145 +1,149 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, Ref, ref, watch } from 'vue';
+import { nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
-import MessageList from './components/MessageList.vue';
-import game, { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress, resetProgress } from './game';
-import { subscribe } from './event';
-import { NPageHeader, NList, NListItem, NThing, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
+import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage } from './game';
+import { emit, subscribe } from './event';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
-import MessageFlow from './components/MessageFlow.vue';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
+import StatusBar from './components/StatusBar.vue';
+
+const naiveMessage = useMessage();
+
+const searchCost = 10;
+
+function load()
+{
+    loadProgress();
+    loadText();
+    const appstateSource = localStorage.getItem('appstate');
+    if (appstateSource != null)
+    {
+        appState.value = JSON.parse(appstateSource);
+        gameScore.value = progress.score;
+        gameTime.value = progress.time;
+    }
+    naiveMessage.success("已读取");
+}
+
+function save()
+{
+    localStorage.setItem('appstate', JSON.stringify(appState.value))
+    localStorage.setItem('progress', JSON.stringify(progress));
+    localStorage.setItem('text', JSON.stringify(text));
+    naiveMessage.success("已保存");
+}
 
 onMounted(()=>{
-    // const progressSource = localStorage.getItem('progress');
-    // if (progressSource != null)
-    // {
-    //     setProgress(JSON.parse(progressSource));
-    //     gameScore.value = progress.score;
-    //     gameTime.value = progress.time;
-    // }
-    // else
-    // {
-        
-    // }
-    // const appstateSource = localStorage.getItem('appstate');
-    // if (appstateSource != null)
-    // {
-    //     appState.value = JSON.parse(appstateSource);
-    // }
-    // loadText();
     window.addEventListener('beforeunload', ()=>{
-        localStorage.setItem('appstate', JSON.stringify(appState.value))
-        localStorage.setItem('progress', JSON.stringify(progress));
+        save();
     });
+    window.addEventListener('keydown', (e)=>{
+        if(e.key==' ')
+        {
+            appState.value.paused = !appState.value.paused;
+            naiveMessage.info(appState.value.paused?"已暂停":"已恢复");
+        }
+    })
     gameInit();
+    const delta = 100;
+    setInterval(()=>{
+        if (appState.value.paused||showStatistic.value) return;
+        gameProcess(delta/1000);
+    },delta);
 });
 
 export interface AppState {
-    mode: "user-edit" | "connect" | "disconnect";
-    editingUser: number;
-    uncollectedMessages: Record<number,Array<number>>;
-    flows: Array<Array<number>>;
+    mode: "select-relationship" | "broadcast";
+    editingRelationship: {i:number,j:number};
+    paused: boolean;
+    selectedUsers: Array<number>
+    focusedUser: number
 }
 
 const appState:Ref<AppState> = ref({
-    mode:'user-edit',
-    editingUser:-1,
-    uncollectedMessages:{},
-    flows:[[]],
+    mode:'select-relationship',
+    editingRelationship:{i:-1,j:-1},
+    paused:true,
+    selectedUsers: [],
+    focusedUser: -1
 });
 
-let messageStatistic:Record<number,{msg:number,views:number,likes:number,exposure:number,score:number,responses:Array<{author:number,content:string}>}>=[];
+const collectedMessage: Ref<Message|undefined> = ref(undefined);
 
-const showUserEditor = ref(false);
-// const showFlowsEditor = ref(false);
+const showEditorDrawer = ref(false);
+const showStatistic = ref(false);
 
-// const messages = ref(progress.messages);
-// function getUserMessages(author:number)
-// {
-//     return messages.value.filter(m=>m.i==author);
-// }
+interface MessageStatistic {views:number,likes:number,score:number,responses:Record<number,string>}
 
-// const editingFlowTags:Ref<Array<string>> = ref([]);
-// function onCreateFlowTag(tag:string):string
-// {
-//     if (editingFlowTags.value.includes(tag))return "";
-//     const flow = text.flowLabel.indexOf(tag);
-//     if (flow==undefined) return "";
-//     if (flow<=0) return "";
-//     return tag;
-// }
-const autoCompleteInstRef = ref<AutoCompleteInst | null>(null)
-watch(autoCompleteInstRef, (value) => {
-  if (value)
-    nextTick(() => value.focus())
-})
-// const flowTagInputValue = ref('');
-// const flowTagOptions = computed(() => {
-//   if (flowTagInputValue.value === null) {
-//     return []
-//   }
-//   return text.flowLabel.filter(label=>!editingFlowTags.value.includes(label)&&label.includes(flowTagInputValue.value)).map((completion) => {
-//     return {
-//       label: completion,
-//       value: completion
-//     }
-//   })
-// })
-subscribe('userPressed', (id)=>
+function createDefaultMessageStatistic()
 {
-    if (progress.userType[id]==0)
+    return {views:0,likes:0,score:0,responses:{}};
+}
+let collectedMessageStatistic:Ref<MessageStatistic> = ref(createDefaultMessageStatistic());
+subscribe('relationSelected', (i,j)=>
+{
+    if (appState.value.mode=="select-relationship")
     {
-        if (appState.value.mode=="user-edit")
-        {
-            showUserEditor.value = true;
-            appState.value.editingUser = id;
-            while (progress.userFlowTags.length <= id)
-            {
-                progress.userFlowTags.push([]);
-            }
-            // editingFlowTags.value = progress.userFlowTags[id].map(flow=>text.flowLabel[flow]);
-        }
+        showEditorDrawer.value = true;
+        collectedMessage.value = undefined;
+        appState.value.editingRelationship = {i,j};
     }
-})
-
-subscribe('addedMessage', (msg:Message)=>{
-    if (!(msg.a in appState.value.uncollectedMessages))
-    {
-        appState.value.uncollectedMessages[msg.a] = [];
-    }
-    appState.value.uncollectedMessages[msg.a].push(msg.id);
 });
-
-function forgetMsg(msg:Message)
+function collectMessage(i:number,j:number)
 {
-    appState.value.uncollectedMessages[msg.a] = appState.value.uncollectedMessages[msg.a].filter(m=>m!=msg.id);
-}
-function collectMsg(msg:Message)
-{
-    forgetMsg(msg);
-    appState.value.flows[0].push(msg.id);
-}
-function finishRound()
-{
-    progress.time += 1;
-    gameTime.value = progress.time;
-    appState.value.uncollectedMessages = {};
-    for(let flow=0;flow<appState.value.flows.length;flow++)
+    let r = -rGet(i,j);
+    if (Math.abs(r) < 0.1)
     {
-        processPushTask(appState.value.flows[flow],flow);
-        appState.value.flows[flow] = [];
+        r = Math.random()?1:-1;
     }
-    updateUsers();
-    if (Object.keys (appState.value.uncollectedMessages).length==0)
+    collectedMessage.value=createMessage(i,i,j,r)
+    progress.score -= searchCost;
+    gameScore.value = progress.score;
+    if (gameScore.value <= searchCost)
     {
         gameEnded.value = true;
     }
-    else if (Object.keys(messageStatistic).length>0)
+}
+function gameProcess(delta:number)
+{
+    updateUsers(delta);
+}
+// function startBroadcastCollectedMessage()
+// {
+//     appState.value.mode = 'broadcast';
+//     appState.value.paused = true;
+//     showEditorDrawer.value = false;
+// }
+// function endBroadcastCollectedMessage()
+// {
+//     emit('tryGetBroadcastCollectedMessageTargets');
+// }
+// function exitBroadcastCollectedMessage()
+// {
+//     appState.value.mode = 'select-relationship';
+// }
+// subscribe('getBroadcastCollectedMessageTargets', (targets:Array<number>)=>
+// {
+
+// })
+function broadcastCollectedMessage()
+{
+    showEditorDrawer.value = false;
+    if (collectedMessage.value == undefined) return;
+    collectedMessageStatistic.value={views:0,likes:0,score:0,responses:{}};
+    gameTime.value = progress.time;
+    for (let user=0;user<progress.userCount;user++)
     {
-        showStatistic.value = true;
+        if (progress.userType[user]!=0) continue;
+        pushMsgToUser(collectedMessage.value,user);
     }
+    rSet(collectedMessage.value.i,collectedMessage.value.j,collectedMessage.value.v);
+    showStatistic.value = true;
+    appState.value.paused = true;
+    appState.value.mode = 'select-relationship';
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
@@ -149,204 +153,171 @@ setInterval(() => {
     windowWidth.value = window.innerWidth;
 }, 1);
 const windowWidth = ref(0);
-function checkoutMessageStatistic(msgId:number)
-{
-    if (!(msgId in messageStatistic))
-    {
-        messageStatistic[msgId]={msg:msgId,views:0,likes:0,exposure:0,score:0,responses:[]};
-    }
-}
-subscribe('viewedMessage',(msgId,view)=>{
-    checkoutMessageStatistic(msgId);
-    messageStatistic[msgId].views = view;
+subscribe('viewedMessage',(view)=>{
+    collectedMessageStatistic.value.views += view;
 });
-subscribe('likedMessage',(msgId,like)=>{
-    checkoutMessageStatistic(msgId);
-    messageStatistic[msgId].likes = like;
+subscribe('likedMessage',(like)=>{
+    collectedMessageStatistic.value.likes += like;
 });
-subscribe('messageKnownExposure',(msgId,exposure)=>{
-    checkoutMessageStatistic(msgId);
-    messageStatistic[msgId].exposure = exposure;
-});
-subscribe('messageGainedScore',(msgId,score)=>{
-    checkoutMessageStatistic(msgId);
-    messageStatistic[msgId].score = score;
+subscribe('messageGainedScore',(score)=>{
+    collectedMessageStatistic.value.score += score;
     progress.score += score;
     gameScore.value = progress.score;
-    roundScore += score;
 });
-subscribe('messageResponsed',(msgId,response)=>{
-    checkoutMessageStatistic(msgId);
-    messageStatistic[msgId].responses.push(response);
+subscribe('messageResponsed',(author,response)=>{
+    collectedMessageStatistic.value.responses[author]=response;
 });
-const showStatistic = ref(false);
-let roundScore = 0;
-const gameScore = ref(0);
+const gameScore = ref(progress.score);
 const gameTime = ref(0);
 const gameEnded = ref(false);
 subscribe('resetProgress', ()=>{
     appState.value={
-        mode:'user-edit',
-        editingUser:-1,
-        uncollectedMessages:{},
-        flows:[[]],
+        mode:'select-relationship',
+        editingRelationship:{i:0,j:0},
+        paused:true,
+        selectedUsers: [],
+        focusedUser: -1
     };
-    messageStatistic=[];
+    collectedMessageStatistic.value=createDefaultMessageStatistic();
     gameTime.value = 0;
-    gameScore.value = 0;
+    gameScore.value = progress.score;
     resetText();
-    gameInit();
 });
 function gameInit()
 {
-    for(let i=0;i<Math.random()*4+4;i++)
-    {
-        createUser(0);
-    }
-    for(let p=0;p<progress.userCount;p++)
-    {
-        const G = getSubjectUserGraph(p);
-        // for(let x=0;x<4;x++)
+    // const size = 10;
+    // for (let g=0;g<1;g++)
+    // {
+    //     for(let i=0;i<size;i++)
+    //     {
+    //         createUser(0);
+    //     }
+    //     for(let i=0;i<size;i++)
+    //     {
+    //         for(let j=0;j<size;j++)
+    //         {
+    //             rSet(g*size+i,g*size+j,Math.random()>0.5?1:-1);
+    //             // rSet(g*size+i,g*size+j,Math.floor(Math.random()*3)-1);
+    //         }
+    //     }
+        // for(let p=3;p<size;p++)
         // {
-        //     for(let o=0;o<4;o++)
+        //     for(let o=0;o<3;o++)
         //     {
-        //         rSetIn(x,o,1,G);
+        //         rSet(g*size+p,g*size+p-1-o,Math.random()>0.5?1:-1);
+        //     }
+        //     for(let o=0;o<3;o++)
+        //     {
+        //         rSet(g*size+p,g*size+o,1);
         //     }
         // }
-        for(let x=0;x<progress.userCount;x++)
-        {
-            rSetIn(p,x,(Math.random()*2-1)*2,G);
-        }
-    }
-    finishRound();
+        // for(let p=0;p<size;p++)
+        // {
+        //     rSet(g*size+p,g*size+p,1);
+        // }
+        // if (g>0)
+        // {
+        //     rSet((g-1)*size, g*size, 1);
+        // }
+    // }
+    createUser(0);
+    createUser(0);
+    createUser(0);
+    createUser(0);
+    rSet(0,1,-1);
+    rSet(0,2,-1);
+    rSet(1,2,-1);
+    rSet(0,3,1);
+    rSet(1,3,2);
+    rSet(2,3,3);
+
+    rSet(0,0,0);
+    rSet(1,1,0);
+    rSet(2,2,0);
 }
 </script>
 
 <template>
 <div class="app">
-    <!-- <p v-for="flow,flowId in appState.flows" :key="flowId">{{ flowId }}</p> -->
     <GameCanvas v-model="appState" ref="canvas"/>
-    <n-modal v-model:show="showStatistic" preset="card" style="margin: 60px;" :title="`第${progress.time}回合统计`" size="huge" :bordered="false"
-        @update-show="(show)=>{if(!show){messageStatistic=[];roundScore=0;}}"
+    <n-modal v-model:show="showStatistic" preset="card" style="margin: 60px;" :title="`数据统计`" size="huge" :bordered="false"
+        @update-show="(show)=>{if(!show){}}"
     >
-        <center>
-            <h3>总得分</h3>
-            <h1><n-number-animation :to="Math.floor(roundScore)"/></h1>
-        </center>
-        <MessageCard v-for="statistic in Object.values(messageStatistic).sort((s1,s2)=>s2.exposure-s1.exposure)" :key=statistic.msg :msg="progress.messages[statistic.msg]">
+        <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
             <template #suffix>
-                <n-list>
-                    <n-list-item v-for="response in statistic.responses" :key="response.author">
-                        <n-card>
-                            <n-thing :title="getUserName(response.author)">
-                                {{ response.content }}
-                            </n-thing>
-                        </n-card>
-                    </n-list-item>
-                </n-list>
+                <n-space>
+                    <n-tag v-for="response,author in collectedMessageStatistic.responses" :key="author" round>
+                            {{getUserName(author)}} {{ response }}
+                    </n-tag>
+                </n-space>
                 <n-row>
                     <n-col :span="12">
-                        <n-statistic label="浏览" :value="statistic.views.toFixed(3)">
+                        <n-statistic label="浏览" :value="(collectedMessageStatistic.views*1000).toFixed()">
                             <template #prefix><n-icon><View/></n-icon></template>
-                            <template #suffix>K</template>
                         </n-statistic>
                     </n-col>
                     <n-col :span="12">
-                        <n-statistic label="点赞" :value="(statistic.likes*(Math.abs(Math.random()-0.8)+0.8)).toFixed(3)">
+                        <n-statistic label="点赞" :value="(collectedMessageStatistic.likes*Math.max(Math.random(),0.5)*1000).toFixed()">
                             <template #prefix><n-icon><ThumbsUp/></n-icon></template>
-                            <template #suffix>K</template>
                         </n-statistic>
                     </n-col>
                     <n-col :span="12">
-                        <n-statistic label="曝光倍率" :value="statistic.exposure">
-                            <template #prefix><n-icon><AnalyticsReference/></n-icon></template>
-                            <template #suffix>x</template>
-                        </n-statistic>
-                    </n-col>
-                    <n-col :span="12">
-                        <n-statistic label="得分" :value="statistic.score.toFixed()">
-                            <template #prefix><n-icon><AiResultsHigh/></n-icon></template>
+                        <n-statistic label="点数获取" :value="collectedMessageStatistic.score.toFixed()">
+                            <template #prefix><n-icon><Network1/></n-icon></template>
                         </n-statistic>
                     </n-col>
                 </n-row>
             </template>
         </MessageCard>
     </n-modal>
-    <MessageFlow class="mainFlow" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
-    <!-- <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
-        <n-drawer-content :body-style="'background-color:transparent;' :body-content-style=""">
-            <div class="flows">
-                <n-flex class="noscroll" style="flex-grow: 1;overflow-y:scroll;">
-                    <MessageFlow v-for="i,flow in appState.flows.length" :key="flow" v-model:label="text.flowLabel[flow]" v-model:source="appState.flows[flow]" :flow="flow"/>
-                    <NCard class="flowControl">
-                        <n-flex vertical>
-                            <n-button @click="appState.flows.push([])">添加</n-button>
-                            <n-button @click="appState.flows.pop()" :disabled="appState.flows.length<=1">移除</n-button>
-                        </n-flex>
-                    </NCard>
-                </n-flex>
-                <div style="border-top: 1px solid gainsboro; height: 8px;"></div>
-                <n-page-header subtitle="推送流" @back="showFlowsEditor=false"></n-page-header>
-            </div>
-        </n-drawer-content>
-    </n-drawer> -->
-        <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth" @update-show="(show)=>{if(!show){
-            // progress.userFlowTags[appState.editingUser]=editingFlowTags.map(label=>text.flowLabel.indexOf(label)).filter(flow=>flow>0);
-            appState.editingUser=-1;
-        }}">
+    <!-- <MessageList class="mainFlow" v-model:label="text.flowLabel[0]" :source="" :flow="0">
+        <template #prefix>
+            <StatusBar/>
+        </template>
+        <template #suffix>
+        </template>
+    </MessageList>-->
+        <n-drawer v-model:show="showEditorDrawer" :width="windowWidth>500?500:windowWidth">
             <n-drawer-content :native-scrollbar="false">
                 <template #header>
-                    <n-page-header subtitle="用户分析" @back="showUserEditor=false"></n-page-header>
-                    <h1>#{{ getUserName(appState.editingUser) }}</h1>
+                    <n-page-header subtitle="用户重合度" @back="showEditorDrawer=false"></n-page-header>
+                    <h1>{{ getUserName(appState.editingRelationship.i) }}↔{{ getUserName(appState.editingRelationship.j) }}={{ rGet(appState.editingRelationship.i,appState.editingRelationship.j).toFixed(2) }}</h1>
                 </template>
-                <!-- <p>
-                <n-dynamic-tags v-model:value="editingFlowTags" @create=onCreateFlowTag>
-                    <template #input="{ submit, deactivate }">
-                    <n-auto-complete
-                        ref="autoCompleteInstRef"
-                        v-model:value="flowTagInputValue"
-                        size="small"
-                        :options="flowTagOptions"
-                        placeholder="添加订阅"
-                        :clear-after-select="true"
-                        @select="submit($event)"
-                        @blur="deactivate"
-                    />
-                    </template>
-                </n-dynamic-tags>
-                </p> -->
-                <!--<n-tabs class="user-editor" type="segment" animated>
-                    <n-tab-pane name="new" tab="最新发言">-->
-                        <MessageCard :msg="progress.messages[msgId]" v-for="msgId in (appState.uncollectedMessages[appState.editingUser])" :key="msgId">
+                <div>
+                    <n-flex vertical>
+                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j)">搜索反例(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
+                        <n-button v-else @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
+                        <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
                             <template #action>
-                                <n-flex justify="space-between">
-                                    <n-button @click="collectMsg(progress.messages[msgId])">收集</n-button>
-                                    <n-button @click="forgetMsg(progress.messages[msgId])">忽略</n-button>
-                                </n-flex>
                             </template>
                         </MessageCard>
-                    <!--</n-tab-pane>
-                    <n-tab-pane name="history" tab="历史发言">
-                        <MessageList :source="getUserMessages(appState.editingUser)" :filter="(msg)=>true" :select="false"/>
-                    </n-tab-pane>
-                </n-tabs>-->
+                    </n-flex>
+                </div>
             </n-drawer-content>
         </n-drawer>
-        <div class="pagebottom">
-            <!-- <div class="buttons">
-                <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button>
-            </div> -->
-            <div class="score">
+        <n-modal v-model:show="gameEnded" preset="card" style="margin: 60px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
+            <p>你耗尽了<Network1/>搜索点数。</p>
+            <center><n-button @click="gameEnded=false;resetProgress();gameInit();">重新开始</n-button></center>
+        </n-modal>
+        <div style="position: fixed;right: 16px;top:16px; display: flex;flex-direction: column;gap:8px">
+            <n-button @click="save" :type="'primary'">保存</n-button>
+            <n-button @click="load" :type="'primary'">读取</n-button>
+        </div>
+        <div class="pagebottom" style="position: absolute;bottom: 0;left: 0;right: 0;">
+            <div class="score" style="font-weight: bold;margin-top:auto">
                 <n-icon><Time/></n-icon> {{ gameTime }} <n-icon><Network1/></n-icon> <n-number-animation :to="gameScore"/>
             </div>
-            <div class="buttons">
-                <n-button round type="primary" size="large" @click="finishRound">结束回合</n-button>
+            <!-- <n-flex vertical v-if="appState.mode=='broadcast'&&collectedMessage!=undefined">
+                <MessageCard :msg="collectedMessage"/>
+                <n-space :justify="'center'">
+                    <n-button class="score" round size="large" @click="endBroadcastCollectedMessage" :disabled="appState.selectedUsers.length==0">完成</n-button>
+                    <n-button class="score" round size="large" @click="exitBroadcastCollectedMessage">取消</n-button>
+                </n-space>
+            </n-flex> -->
+            <div class="buttons" style="margin-top:auto">
+                <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} space</n-button>
             </div>
         </div>
-        <n-modal v-model:show="gameEnded" preset="card" style="margin: 60px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
-            <p>你的网络在第<b>{{ gameTime }}</b>回合安静下来了，你的得分是<b>{{ gameScore }}</b>。</p>
-            <center><n-button @click="gameEnded=false;resetProgress()">重新开始</n-button></center>
-        </n-modal>
 </div>
 </template>
 
@@ -355,6 +326,7 @@ body
 {
     margin: 0;
     overflow: hidden;
+    user-select: none;
 }
 
 .app
@@ -368,11 +340,6 @@ body
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-@media (max-width: 500px) {
-    .user-editor-container {
-        width: 400px;
-    }
 }
 .flows
 {
@@ -389,8 +356,6 @@ body
     width: 300px;
     margin: 8px;
     box-shadow: 0 0 5px 0px rgba(0,0,0,0.5);
-    overflow-y: scroll;
-    height: 100%;
 }
 .flow::-webkit-scrollbar {
     display: none;
@@ -405,32 +370,46 @@ body
 }
 .pagebottom
 {
+    flex: 0;
     display:flex;
-    position:absolute;
-    height:40px;
     justify-content:space-between;
-    bottom:8px;
-    left:8px;
-    right:8px;
+    margin: 8px;
 }
 .score
 {
+    top:auto;
+    bottom:0;
     background: white;
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
-    border-radius: 8px;
+    /* box-shadow: 0 0 5px rgba(0,0,0,0.5); */
+    border-radius: 20px;
     color:black;
     padding: 8px;
     text-wrap-mode: nowrap;
     text-align: center;
-    font-weight: bold;
 }
 .mainFlow
 {
     z-index:999;
-    position:absolute;
+    position:fixed;
     left:8px;
     top:8px;
+    bottom: 8px;
     z-index:999;
-    height: 60%;
+}
+@media screen and (max-width:600px) {
+    .mainFlow
+    {
+        width: auto;
+        top:auto;
+        right: 8px;
+        height: 30%;
+    }
+    .user-editor-message-list
+    {
+        display: flex;
+        flex-direction: row;
+        height: 100%;
+        flex-wrap: wrap;
+    }
 }
 </style>

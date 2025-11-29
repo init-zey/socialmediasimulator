@@ -1,51 +1,63 @@
 import { emit } from "./event";
-import { getUserName } from "./text";
+import { getResponse, getUserName } from "./text";
 
 export interface Message {id:number, a:number, i:number, j:number, v:number, t:number}
 
 export interface Progress{
   userMemory: Record<number, Array<number>>;
-  subjectiveUserGraph: Record<number, Record<string, number>>;
+  userGraph: Record<string, number>;
   messages: Array<Message>;
   userCount: number;
   userType: Array<number>;
-  userLearnRate: Array<number>;
+  userAttention: Array<Record<number,number>>;
   userFlowTags: Array<Array<number>>;
   time: number;
   score: number;
 }
 
+let userGraphChange:Record<string, number>={};
+
 export let debugMode = false;
 
 export let progress:Progress = {
   userMemory: {},
-  subjectiveUserGraph: {},
+  userGraph: {},
   messages: [],
   userType: [],
-  userLearnRate: [],
+  userAttention: [],
   userCount: 0,
   userFlowTags: [],
   time: 0,
-  score: 0
+  score: 1000
 }
 
 export function resetProgress()
 {
   progress = {
     userMemory: {},
-    subjectiveUserGraph: {},
+    userGraph: {},
     messages: [],
     userType: [],
-    userLearnRate: [],
+    userAttention: [],
     userCount: 0,
     userFlowTags: [],
     time: 0,
-    score: 0
+    score: 1000
   };
   emit("resetProgress");
 }
 
-export function setProgress(newProgress:Progress)
+export function loadProgress()
+{
+  resetProgress();
+  const progressSource = localStorage.getItem('progress');
+  if (progressSource != null)
+  {
+    setProgress(JSON.parse(progressSource));  
+  }
+}
+
+function setProgress(newProgress:Progress)
 {
   resetProgress();
   progress = newProgress;
@@ -58,48 +70,33 @@ export function setProgress(newProgress:Progress)
   });
 }
 
-export function getSubjectUserGraph(user:number):Record<string,number>
+export function rGet(a:number,b:number):number
 {
-  if (!(user in progress.subjectiveUserGraph))
-  {
-    progress.subjectiveUserGraph[user] = {};
-  }
-  return progress.subjectiveUserGraph[user];
+  return rGetIn(a,b,progress.userGraph);
 }
-
-export function rGetIn(a:number,b:number,graph:Record<string,number>):number
+function rGetIn(a:number,b:number,G:Record<string,number>):number
 {
-  if(a>b){
-    return rGetIn(b,a,graph);
-  }
+  if (a>b) return rGet(b,a);
   const k = a.toString(32)+'_'+b.toString(32);
-  if (!(k in graph)) {
+  if (!(k in G)) {
     return 0;
   }
-  return graph[k];
+  return G[k];
 }
 
-export function rSetIn(a:number,b:number,v:number,graph:Record<string,number>)
+export function rSet(a:number,b:number,v:number)
 {
-  if(a>b) {
-    rSetIn(b,a,v,graph);
+  rSetIn(a,b,v,progress.userGraph);
+}
+function rSetIn(a:number,b:number,v:number,G:Record<string,number>)
+{
+  if (a>b)
+  {
+    rSetIn(b,a,v,G);
     return;
   }
   const k = a.toString(32)+'_'+b.toString(32);
-  graph[k] = v;
-}
-
-export function processPushTask(tasks:Array<number>,flow:number)
-{
-  for(let user=0;user<progress.userCount;user++)
-  {
-    if (progress.userType[user]!=0) continue;
-    const flowTags = progress.userFlowTags[user];
-    if (flow!=0&&(flowTags==undefined||!flowTags.includes(flow))) continue;
-    for(let i=0;i<tasks.length;i++){
-      pushMsgToUser(progress.messages[tasks[i]], user, tasks.length-i);
-    }
-  }
+  G[k] = v;
 }
 
 export function createMessage(a:number, i:number, j:number, v:number)
@@ -107,77 +104,79 @@ export function createMessage(a:number, i:number, j:number, v:number)
   const msg = {id:progress.messages.length,a,i,j,v,t:progress.time};
   progress.messages.push(msg);
   emit('addedMessage', msg);
+  return msg;
 }
 
-function changeAttitude(user:number, a:number, b:number, d:number):number
+function changeAttitude(a:number, b:number, d:number):number
 {
-  const graph = getSubjectUserGraph(user);
-  const value=rGetIn(a,b,graph)+d;
-  rSetIn(a,b,value,graph);
+  const value=rGetIn(a,b,userGraphChange)+d;
+  rSetIn(a,b,value,userGraphChange);
   return d;
 }
 
-function updateUser(user:number)
+function updateUser(user:number,delta:number)
 {
-  console.log(`update ${user}`);
   const oxPairs:Array<string> = [];
-
-  const G = getSubjectUserGraph(user);
-  for(let t=0;t<3;t++)
+  let maxIPD_o = -1;
+  let maxIPD_x = -1;
+  let maxIPD = 0;
+  for(let o=0;o<progress.userCount;o++)
   {
-    let maxIPD_o = -1;
-    let maxIPD_x = -1;
-    let maxIPD = 0;
-    for(let o=0;o<progress.userCount;o++)
+    for(let x=o;x<progress.userCount;x++)
     {
-      for(let x=o;x<progress.userCount;x++)
+      if (oxPairs.includes(`${o}_${x}`))
       {
-        if (oxPairs.includes(`${o}_${x}`))
-        {
-          continue;
-        }
-        let IPD = instabilityPartialD(o,x,G);
-        if (o!=user) IPD *= (1-progress.userLearnRate[user]) * 0.5;
-        if (x==user) IPD *= 0.5;
-        if (Math.abs(IPD) > Math.abs(maxIPD))
-        {
-          maxIPD = IPD;
-          maxIPD_o = o;
-          maxIPD_x = x;
-        }
+        continue;
+      }
+      const IPD = instabilityPartialD(o,x);
+      // if (o!=user) IPD *= (1-progress.userLearnRate[user]);
+      // if (x==user) IPD *= 0.5;
+      if (Math.abs(IPD) > Math.abs(maxIPD))
+      {
+        maxIPD = IPD;
+        maxIPD_o = o;
+        maxIPD_x = x;
       }
     }
-    if(maxIPD_o>=0)
-    {
-      const dAttitude = -Math.atan(maxIPD)/3.14;
-      console.log(`Dmax|dG(${maxIPD_o},${maxIPD_x})=${maxIPD},dAttitude=${dAttitude}`);
-      changeAttitude(user,maxIPD_o,maxIPD_x,dAttitude*(maxIPD_o==user?1:0.1));
-      if (Math.abs(dAttitude)>0.4)
-      {
-        createMessage(user,maxIPD_o,maxIPD_x,dAttitude);
-      }
-      oxPairs.push(`${maxIPD_o}_${maxIPD_x}`);
-    }
-    else
-    {
-      return;
-    }
+  }
+  if(maxIPD_o>=0)
+  {
+    const dAttitude = -1/maxIPD;
+    changeAttitude(maxIPD_o,maxIPD_x,delta*dAttitude);
+    oxPairs.push(`${maxIPD_o}_${maxIPD_x}`);
   }
 }
 
-function instability(p:number)
+function applyChange()
 {
-  const G = getSubjectUserGraph(p);
+  for(const k in userGraphChange)
+  {
+    const v = userGraphChange[k];
+    progress.userGraph[k] += v;
+  }
+  userGraphChange = {};
+}
+
+export function instability(p:number,log:boolean=false)
+{
   let s = 0;
+  const Gpp = rGet(p,p);
   for(let x=0;x<progress.userCount;x++)
   {
-    const Gpx = rGetIn(p,x,G);
-    for(let o=x;o<progress.userCount;o++)
+    const Gpx = rGet(p,x);
+    for(let o=0;o<progress.userCount;o++)
     {
-      const Gpo = rGetIn(p,o,G);
-      const Gox = rGetIn(o,x,G);
-      const i = Gpo*Gox-Gpx;
-      s+=i*i;
+      const Gpo = rGet(p,o);
+      const Gox = rGet(o,x);
+      const i = Gpx*Gpo*Gox+Gpp;
+      if(log)
+      {
+        console.log(`Gpo=${Gpo}`)
+        console.log(`Gox=${Gox}`)
+        console.log(`Gpx=${Gpx}`)
+        console.log(`i(p=${p},o=${o},x=${x})=${i}`)
+      }
+      s-=Math.min(i,0);
     }
   }
   return s;
@@ -191,23 +190,51 @@ function instability(p:number)
 //   return (pdir + ndir) * 0.5;
 // }
 
-function instabilityPartialD(p:number,o:number,G:Record<string,number>)
+function instabilityPartialD(p:number,o:number)
 {
   let d = 0;
-  const Gpo = rGetIn(p,o,G);
+  const Gpp = rGet(p,p);
+  const Gpo = rGet(p,o);
+  // if (Gpo == 0) return 0;
   for(let x=0;x<progress.userCount;x++)
   {
-    const Gox = rGetIn(o,x,G);
-    const Gpx = rGetIn(p,x,G);
-    d+=Gox*(Gpo*Gox-Gpx);
-    d-=Gpx*Gox-Gpo;
+    const Gox = rGet(o,x);
+    const Gpx = rGet(p,x);
+    if (Gpo*Gox*Gpx+Gpp>=0) continue;
+    if (x==o)
+    {
+      if (p==x)
+      {
+        d-=3*Gpo*Gpo+1;
+      }
+      else
+      {
+        d-=2*Gox*Gpo;
+      }
+    }
+    else
+    {
+      if (p==o)
+      {
+        //GpoGoxGpx-Gpo^3
+        d-=Gox*Gpx+1
+      }
+      else
+      {
+        d-=Gox*Gpx;
+      }
+    }
+    // if (Gox==0) continue;
+    // const Gpx = rGet(p,x);
+    // d+=Gox*(Gpo*Gox-Gpx);
+    // d-=Gpx*Gox-Gpo;
   }
-  const GooSub = rGetIn(o,o,G)-1;
-  d-=Gpo*GooSub*GooSub;
+  // const GooSub = rGet(o,o)-1;
+  // d-=Gpo*GooSub*GooSub;
   return d;
 }
 
-export function pushMsgToUser(msg:Message, user:number, exposure:number)
+export async function pushMsgToUser(msg:Message, user:number)
 {
   if (user==msg.a) return;
   if(!(user in progress.userMemory))
@@ -215,46 +242,37 @@ export function pushMsgToUser(msg:Message, user:number, exposure:number)
     progress.userMemory[user] = [];
   }
   progress.userMemory[user].push(msg.id);
-  const graph = getSubjectUserGraph(user);
+  const oldGij = rGet(msg.i,msg.j);
   const oldInstability = instability(user);
-  const ox = rGetIn(msg.i,msg.j,graph);
-  const lambda = progress.userLearnRate[user];
-  rSetIn(msg.i,msg.j,ox+lambda*rGetIn(user,msg.a,graph)*(msg.v-ox),graph);
+  rSet(msg.i,msg.j,msg.v);
   const newInstability = instability(user);
-  const d = oldInstability - newInstability;
-  const views = Math.abs(d) * exposure;
-  const likes = d>0?d:(Math.random()*Math.abs(d)*0.5) * exposure;
-  emit('viewedMessage', msg.id, views);
-  emit('likedMessage', msg.id, likes);
-  emit('messageKnownExposure', msg.id, exposure);
-  if (views > 1)
+  rSet(msg.i,msg.j,oldGij);
+  const d = newInstability - oldInstability;
+  console.log(d);
+  const views = Math.abs(d);
+  const likes = d>0?d:(Math.random()*Math.abs(d)*0.5);
+  emit('viewedMessage', views);
+  emit('likedMessage', likes);
+  if (views > 0.1)
   {
-    let responseContent = "";
-    if (d > 0)
-    {
-      responseContent = "支持"
-    }
-    else
-    {
-      responseContent = "不支持";
-    }
-    emit('messageResponsed', msg.id, {author:user,content:responseContent})
+    emit('messageResponsed',user,getResponse(user, msg, d))
   }
-  emit('messageGainedScore', msg.id, Math.floor(views+likes));
+  emit('messageGainedScore',Math.floor(views+likes));
 }
 
-export function updateUsers()
+export function updateUsers(delta:number)
 {
   for(let i=0;i<progress.userCount;i++)
   {
     if(progress.userType[i]!=0) continue;
-    updateUser(i);
+    updateUser(i,delta);
   }
+  applyChange();
 }
 
 export function getRepulsion(i:number, j:number):boolean
 {
-    const rij=(a:number,b:number)=>Math.abs(rGetIn(a,b,getSubjectUserGraph(a)))<0.5;
+    const rij=(a:number,b:number)=>rGet(a,b)<0.5;
     let repulsion = rij(i,j);
     if (!repulsion)
     {
@@ -278,12 +296,12 @@ export function getRepulsion(i:number, j:number):boolean
     return repulsion;
 }
 
-export function createUser(type:number,learnRate:number=0.5)
+export function createUser(type:number,learnRate:number=0.8)
 {
     const id = progress.userCount;
     progress.userCount += 1;
     progress.userType.push(type);
-    progress.userLearnRate.push(learnRate);
+    progress.userAttention.push({});
     emit("createdUser",id);
 }
 

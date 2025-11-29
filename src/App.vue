@@ -258,7 +258,7 @@ function gameInit()
             </template>
         </MessageCard>
     </n-modal>
-    <MessageFlow style="box-shadow: none; background: none; border: none; padding: 20px; z-index: 999; position: fixed; left: 20px; top: 20px; bottom: 20px;" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
+    <MessageFlow style="z-index: 999; position: fixed; left: 20px; top: 20px; bottom: 20px;" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
     <!-- <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
         <n-drawer-content :body-style="'background-color:transparent;' :body-content-style=""">
             <div class="flows">

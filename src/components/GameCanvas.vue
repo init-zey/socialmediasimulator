@@ -339,11 +339,11 @@ function redraw()
                 const toId = parseInt(splited[1],32);
                 const to = state.value.users[toId];
                 let aFT = Math.abs(rFT);
-                if (aFT > 1) aFT = 1;
+                if (aFT > 0.5) {aFT = 1} else {aFT=0}
                 const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
                 const rTF = rGetIn(fromId, toId, getSubjectUserGraph(toId));
                 let aTF = Math.abs(rTF);
-                if (aTF > 1) aTF = 1;
+                if (aTF > 0.5) {aTF = 1} else {aTF=0}
                 const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
                 const x1 = (from.x+x.value)*s.value;
                 const y1 = (from.y+y.value)*s.value;

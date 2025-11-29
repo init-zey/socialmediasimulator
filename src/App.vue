@@ -5,7 +5,7 @@ import MessageCard from './components/MessageCard.vue';
 import MessageList from './components/MessageList.vue';
 import game, { createUser, Message, progress, processPushTask, getSubjectUserGraph, rSetIn, updateUsers, setProgress, resetProgress } from './game';
 import { subscribe } from './event';
-import { NPageHeader, NTabs, NTabPane, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
+import { NPageHeader, NList, NListItem, NThing, NDrawer, NDrawerContent, NButton, NFlex, NDynamicTags, AutoCompleteInst, NAutoComplete, NCard, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, NDivider } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import MessageFlow from './components/MessageFlow.vue';
@@ -41,7 +41,6 @@ export interface AppState {
     editingUser: number;
     uncollectedMessages: Record<number,Array<number>>;
     flows: Array<Array<number>>;
-    messageStatistic: Array<{msg:number,views:number,likes:number,exposure:number,score:number}>;
 }
 
 const appState:Ref<AppState> = ref({
@@ -49,44 +48,45 @@ const appState:Ref<AppState> = ref({
     editingUser:-1,
     uncollectedMessages:{},
     flows:[[]],
-    messageStatistic:[]
 });
 
+let messageStatistic:Record<number,{msg:number,views:number,likes:number,exposure:number,score:number,responses:Array<{author:number,content:string}>}>=[];
+
 const showUserEditor = ref(false);
-const showFlowsEditor = ref(false);
+// const showFlowsEditor = ref(false);
 
-const messages = ref(progress.messages);
-function getUserMessages(author:number)
-{
-    return messages.value.filter(m=>m.i==author);
-}
+// const messages = ref(progress.messages);
+// function getUserMessages(author:number)
+// {
+//     return messages.value.filter(m=>m.i==author);
+// }
 
-const editingFlowTags:Ref<Array<string>> = ref([]);
-function onCreateFlowTag(tag:string):string
-{
-    if (editingFlowTags.value.includes(tag))return "";
-    const flow = text.flowLabel.indexOf(tag);
-    if (flow==undefined) return "";
-    if (flow<=0) return "";
-    return tag;
-}
+// const editingFlowTags:Ref<Array<string>> = ref([]);
+// function onCreateFlowTag(tag:string):string
+// {
+//     if (editingFlowTags.value.includes(tag))return "";
+//     const flow = text.flowLabel.indexOf(tag);
+//     if (flow==undefined) return "";
+//     if (flow<=0) return "";
+//     return tag;
+// }
 const autoCompleteInstRef = ref<AutoCompleteInst | null>(null)
 watch(autoCompleteInstRef, (value) => {
   if (value)
     nextTick(() => value.focus())
 })
-const flowTagInputValue = ref('');
-const flowTagOptions = computed(() => {
-  if (flowTagInputValue.value === null) {
-    return []
-  }
-  return text.flowLabel.filter(label=>!editingFlowTags.value.includes(label)&&label.includes(flowTagInputValue.value)).map((completion) => {
-    return {
-      label: completion,
-      value: completion
-    }
-  })
-})
+// const flowTagInputValue = ref('');
+// const flowTagOptions = computed(() => {
+//   if (flowTagInputValue.value === null) {
+//     return []
+//   }
+//   return text.flowLabel.filter(label=>!editingFlowTags.value.includes(label)&&label.includes(flowTagInputValue.value)).map((completion) => {
+//     return {
+//       label: completion,
+//       value: completion
+//     }
+//   })
+// })
 subscribe('userPressed', (id)=>
 {
     if (progress.userType[id]==0)
@@ -99,7 +99,7 @@ subscribe('userPressed', (id)=>
             {
                 progress.userFlowTags.push([]);
             }
-            editingFlowTags.value = progress.userFlowTags[id].map(flow=>text.flowLabel[flow]);
+            // editingFlowTags.value = progress.userFlowTags[id].map(flow=>text.flowLabel[flow]);
         }
     }
 })
@@ -136,9 +136,8 @@ function finishRound()
     {
         gameEnded.value = true;
     }
-    else if (appState.value.messageStatistic.length>0)
+    else if (Object.keys(messageStatistic).length>0)
     {
-        appState.value.messageStatistic = appState.value.messageStatistic.sort((s1,s2)=>s2.exposure-s1.exposure);
         showStatistic.value = true;
     }
 }
@@ -152,28 +151,34 @@ setInterval(() => {
 const windowWidth = ref(0);
 function checkoutMessageStatistic(msgId:number)
 {
-    for (let i=0;i<appState.value.messageStatistic.length;i++)
+    if (!(msgId in messageStatistic))
     {
-        if (appState.value.messageStatistic[i].msg == msgId) return i;
+        messageStatistic[msgId]={msg:msgId,views:0,likes:0,exposure:0,score:0,responses:[]};
     }
-    appState.value.messageStatistic.push({msg:msgId,views:0,likes:0,exposure:0,score:0});
-    return appState.value.messageStatistic.length-1;
 }
 subscribe('viewedMessage',(msgId,view)=>{
-    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].views = view;
-})
+    checkoutMessageStatistic(msgId);
+    messageStatistic[msgId].views = view;
+});
 subscribe('likedMessage',(msgId,like)=>{
-    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].likes = like;
-})
+    checkoutMessageStatistic(msgId);
+    messageStatistic[msgId].likes = like;
+});
 subscribe('messageKnownExposure',(msgId,exposure)=>{
-    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].exposure = exposure;
-})
+    checkoutMessageStatistic(msgId);
+    messageStatistic[msgId].exposure = exposure;
+});
 subscribe('messageGainedScore',(msgId,score)=>{
-    appState.value.messageStatistic[checkoutMessageStatistic(msgId)].score = score;
+    checkoutMessageStatistic(msgId);
+    messageStatistic[msgId].score = score;
     progress.score += score;
     gameScore.value = progress.score;
     roundScore += score;
-})
+});
+subscribe('messageResponsed',(msgId,response)=>{
+    checkoutMessageStatistic(msgId);
+    messageStatistic[msgId].responses.push(response);
+});
 const showStatistic = ref(false);
 let roundScore = 0;
 const gameScore = ref(0);
@@ -185,8 +190,8 @@ subscribe('resetProgress', ()=>{
         editingUser:-1,
         uncollectedMessages:{},
         flows:[[]],
-        messageStatistic:[]
     };
+    messageStatistic=[];
     gameTime.value = 0;
     gameScore.value = 0;
     resetText();
@@ -221,15 +226,24 @@ function gameInit()
 <div class="app">
     <!-- <p v-for="flow,flowId in appState.flows" :key="flowId">{{ flowId }}</p> -->
     <GameCanvas v-model="appState" ref="canvas"/>
-    <n-modal v-model:show="showStatistic" preset="card" style="width: 600px;" :title="`第${progress.time}回合统计`" size="huge" :bordered="false"
-        @update-show="(show)=>{if(!show){appState.messageStatistic=[];roundScore=0;}}"
+    <n-modal v-model:show="showStatistic" preset="card" style="margin: 60px;" :title="`第${progress.time}回合统计`" size="huge" :bordered="false"
+        @update-show="(show)=>{if(!show){messageStatistic=[];roundScore=0;}}"
     >
         <center>
             <h3>总得分</h3>
             <h1><n-number-animation :to="Math.floor(roundScore)"/></h1>
         </center>
-        <MessageCard v-for="statistic in appState.messageStatistic" :key=statistic.msg :msg="progress.messages[statistic.msg]">
+        <MessageCard v-for="statistic in Object.values(messageStatistic).sort((s1,s2)=>s2.exposure-s1.exposure)" :key=statistic.msg :msg="progress.messages[statistic.msg]">
             <template #suffix>
+                <n-list>
+                    <n-list-item v-for="response in statistic.responses" :key="response.author">
+                        <n-card>
+                            <n-thing :title="getUserName(response.author)">
+                                {{ response.content }}
+                            </n-thing>
+                        </n-card>
+                    </n-list-item>
+                </n-list>
                 <n-row>
                     <n-col :span="12">
                         <n-statistic label="浏览" :value="statistic.views.toFixed(3)">
@@ -258,7 +272,7 @@ function gameInit()
             </template>
         </MessageCard>
     </n-modal>
-    <MessageFlow style="z-index: 999; position: fixed; left: 20px; top: 20px; bottom: 20px;" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
+    <MessageFlow class="mainFlow" v-model:label="text.flowLabel[0]" v-model:source="appState.flows[0]" :flow="0"/>
     <!-- <n-drawer v-model:show="showFlowsEditor" :width="windowWidth" :placement="'left'">
         <n-drawer-content :body-style="'background-color:transparent;' :body-content-style=""">
             <div class="flows">
@@ -277,8 +291,7 @@ function gameInit()
         </n-drawer-content>
     </n-drawer> -->
         <n-drawer class="user-editor-container" v-model:show="showUserEditor" :width="windowWidth>500?500:windowWidth" @update-show="(show)=>{if(!show){
-            progress.userFlowTags[appState.editingUser]=editingFlowTags.map(label=>text.flowLabel.indexOf(label)).filter(flow=>flow>0);
-            console.log(progress.userFlowTags[appState.editingUser]);
+            // progress.userFlowTags[appState.editingUser]=editingFlowTags.map(label=>text.flowLabel.indexOf(label)).filter(flow=>flow>0);
             appState.editingUser=-1;
         }}">
             <n-drawer-content :native-scrollbar="false">
@@ -320,9 +333,9 @@ function gameInit()
             </n-drawer-content>
         </n-drawer>
         <div class="pagebottom">
-            <div class="buttons">
-                <!-- <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button> -->
-            </div>
+            <!-- <div class="buttons">
+                <n-button round type="primary" size="large" @click="showFlowsEditor=true">编辑推送流</n-button>
+            </div> -->
             <div class="score">
                 <n-icon><Time/></n-icon> {{ gameTime }} <n-icon><Network1/></n-icon> <n-number-animation :to="gameScore"/>
             </div>
@@ -330,7 +343,7 @@ function gameInit()
                 <n-button round type="primary" size="large" @click="finishRound">结束回合</n-button>
             </div>
         </div>
-        <n-modal v-model:show="gameEnded" preset="card" style="width: 600px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
+        <n-modal v-model:show="gameEnded" preset="card" style="margin: 60px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
             <p>你的网络在第<b>{{ gameTime }}</b>回合安静下来了，你的得分是<b>{{ gameScore }}</b>。</p>
             <center><n-button @click="gameEnded=false;resetProgress()">重新开始</n-button></center>
         </n-modal>
@@ -373,11 +386,11 @@ body
 }
 .flow
 {
-    overflow-y: scroll;
     width: 300px;
-    height: 100%;
     margin: 8px;
     box-shadow: 0 0 5px 0px rgba(0,0,0,0.5);
+    overflow-y: scroll;
+    height: 100%;
 }
 .flow::-webkit-scrollbar {
     display: none;
@@ -396,9 +409,9 @@ body
     position:absolute;
     height:40px;
     justify-content:space-between;
-    bottom:20px;
-    left:20px;
-    right:20px;
+    bottom:8px;
+    left:8px;
+    right:8px;
 }
 .score
 {
@@ -410,5 +423,14 @@ body
     text-wrap-mode: nowrap;
     text-align: center;
     font-weight: bold;
+}
+.mainFlow
+{
+    z-index:999;
+    position:absolute;
+    left:8px;
+    top:8px;
+    z-index:999;
+    height: 60%;
 }
 </style>

@@ -1,4 +1,5 @@
 import { emit } from "./event";
+import { getUserName } from "./text";
 
 export interface Message {id:number, a:number, i:number, j:number, v:number, t:number}
 
@@ -113,39 +114,54 @@ function changeAttitude(user:number, a:number, b:number, d:number):number
   const graph = getSubjectUserGraph(user);
   const value=rGetIn(a,b,graph)+d;
   rSetIn(a,b,value,graph);
-  if (Math.abs(d)>0.2)
-  {
-    createMessage(user,a,b,value);
-  }
   return d;
 }
 
 function updateUser(user:number)
 {
   console.log(`update ${user}`);
-  let maxIPD = 0;
-  let maxIPD_o = -1;
-  let maxIPD_x = -1;
+  const oxPairs:Array<string> = [];
+
   const G = getSubjectUserGraph(user);
-  for(let o=0;o<progress.userCount;o++)
+  for(let t=0;t<3;t++)
   {
-    for(let x=0;x<progress.userCount;x++)
+    let maxIPD_o = -1;
+    let maxIPD_x = -1;
+    let maxIPD = 0;
+    for(let o=0;o<progress.userCount;o++)
     {
-      let IPD = instabilityPartialD(o,x,G);
-      if (o!=user) IPD *= (1-progress.userLearnRate[user]);
-      if (Math.abs(IPD) > Math.abs(maxIPD))
+      for(let x=o;x<progress.userCount;x++)
       {
-        maxIPD = IPD;
-        maxIPD_o = o;
-        maxIPD_x = x;
+        if (oxPairs.includes(`${o}_${x}`))
+        {
+          continue;
+        }
+        let IPD = instabilityPartialD(o,x,G);
+        if (o!=user) IPD *= (1-progress.userLearnRate[user]) * 0.5;
+        if (x==user) IPD *= 0.5;
+        if (Math.abs(IPD) > Math.abs(maxIPD))
+        {
+          maxIPD = IPD;
+          maxIPD_o = o;
+          maxIPD_x = x;
+        }
       }
     }
-  }
-  if(maxIPD_o>=0)
-  {
-    const dAttitude = -Math.atan(maxIPD)/3.14;
-    console.log(`Dmax|dG(${maxIPD_o},${maxIPD_x})=${maxIPD},dAttitude=${dAttitude}`);
-    changeAttitude(user, maxIPD_o, maxIPD_x, dAttitude);
+    if(maxIPD_o>=0)
+    {
+      const dAttitude = -Math.atan(maxIPD)/3.14;
+      console.log(`Dmax|dG(${maxIPD_o},${maxIPD_x})=${maxIPD},dAttitude=${dAttitude}`);
+      changeAttitude(user,maxIPD_o,maxIPD_x,dAttitude*(maxIPD_o==user?1:0.1));
+      if (Math.abs(dAttitude)>0.4)
+      {
+        createMessage(user,maxIPD_o,maxIPD_x,dAttitude);
+      }
+      oxPairs.push(`${maxIPD_o}_${maxIPD_x}`);
+    }
+    else
+    {
+      return;
+    }
   }
 }
 
@@ -193,6 +209,7 @@ function instabilityPartialD(p:number,o:number,G:Record<string,number>)
 
 export function pushMsgToUser(msg:Message, user:number, exposure:number)
 {
+  if (user==msg.a) return;
   if(!(user in progress.userMemory))
   {
     progress.userMemory[user] = [];
@@ -205,12 +222,25 @@ export function pushMsgToUser(msg:Message, user:number, exposure:number)
   rSetIn(msg.i,msg.j,ox+lambda*rGetIn(user,msg.a,graph)*(msg.v-ox),graph);
   const newInstability = instability(user);
   const d = oldInstability - newInstability;
-  const views = Math.abs(d);
-  const likes = d>0?d:(Math.random()*Math.abs(d)*0.5);
+  const views = Math.abs(d) * exposure;
+  const likes = d>0?d:(Math.random()*Math.abs(d)*0.5) * exposure;
   emit('viewedMessage', msg.id, views);
   emit('likedMessage', msg.id, likes);
   emit('messageKnownExposure', msg.id, exposure);
-  emit('messageGainedScore', msg.id, Math.floor((views+likes)*exposure));
+  if (views > 1)
+  {
+    let responseContent = "";
+    if (d > 0)
+    {
+      responseContent = "支持"
+    }
+    else
+    {
+      responseContent = "不支持";
+    }
+    emit('messageResponsed', msg.id, {author:user,content:responseContent})
+  }
+  emit('messageGainedScore', msg.id, Math.floor(views+likes));
 }
 
 export function updateUsers()

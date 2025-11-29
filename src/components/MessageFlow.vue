@@ -29,7 +29,7 @@ import { progress } from '@/game';
 import MessageCard from './MessageCard.vue';
 import draggable from 'vuedraggable';
 import { defineProps, defineModel } from 'vue';
-import { NButton, NInput, NTag, NCard } from 'naive-ui';
+import { NInput, NCard, NScrollbar } from 'naive-ui';
 
 defineProps<{flow:number}>();
 const source = defineModel<Array<number>>("source");

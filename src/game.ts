@@ -1,5 +1,7 @@
+import { ref, Ref } from "vue";
 import { emit } from "./event";
-import { getResponse, getUserName } from "./text";
+import { getBubbleText, getResponse, getUserName, text, topicNames } from "./text";
+import userNames from "./userNames";
 
 export interface Message {id:number, a:number, i:number, j:number, v:number, t:number}
 
@@ -11,8 +13,6 @@ export interface Progress{
   userType: Array<number>;
   userAttention: Array<Record<number,number>>;
   userFlowTags: Array<Array<number>>;
-  time: number;
-  score: number;
 }
 
 let userGraphChange:Record<string, number>={};
@@ -26,10 +26,10 @@ export let progress:Progress = {
   userType: [],
   userAttention: [],
   userCount: 0,
-  userFlowTags: [],
-  time: 0,
-  score: 1000
+  userFlowTags: []
 }
+export const time= ref(0);
+export const score= ref(100);
 
 export function resetProgress()
 {
@@ -40,10 +40,10 @@ export function resetProgress()
     userType: [],
     userAttention: [],
     userCount: 0,
-    userFlowTags: [],
-    time: 0,
-    score: 1000
+    userFlowTags: []
   };
+  time.value = 0;
+  score.value = 100;
   emit("resetProgress");
 }
 
@@ -53,8 +53,17 @@ export function loadProgress()
   const progressSource = localStorage.getItem('progress');
   if (progressSource != null)
   {
-    setProgress(JSON.parse(progressSource));  
+    setProgress(JSON.parse(progressSource));
   }
+  time.value = parseInt(localStorage.getItem("time")??"0");
+  score.value = parseInt(localStorage.getItem("score")??"0");
+}
+
+export function saveProgress()
+{
+  localStorage.setItem('progress', JSON.stringify(progress));
+  localStorage.setItem('time', time.value.toString());
+  localStorage.setItem('score', score.value.toString());
 }
 
 function setProgress(newProgress:Progress)
@@ -101,7 +110,7 @@ function rSetIn(a:number,b:number,v:number,G:Record<string,number>)
 
 export function createMessage(a:number, i:number, j:number, v:number)
 {
-  const msg = {id:progress.messages.length,a,i,j,v,t:progress.time};
+  const msg = {id:progress.messages.length,a,i,j,v,t:time.value};
   progress.messages.push(msg);
   emit('addedMessage', msg);
   return msg;
@@ -109,42 +118,28 @@ export function createMessage(a:number, i:number, j:number, v:number)
 
 function changeAttitude(a:number, b:number, d:number):number
 {
-  const value=rGetIn(a,b,userGraphChange)+d;
-  rSetIn(a,b,value,userGraphChange);
+  const oldValue=rGetIn(a,b,userGraphChange);
+  const newValue=oldValue+d;
+  rSetIn(a,b,newValue,userGraphChange);
+  const random = Math.random()>0.5;
+  const i = random?a:b;
+  const j = random?b:a;
+  const bubbleText = getBubbleText(i,j,rGet(i,j)+newValue,rGet(i,j)+oldValue);
+  if (bubbleText != '')
+  {
+    emit('userBubbleText',i,bubbleText);
+  }
   return d;
 }
 
 function updateUser(user:number,delta:number)
 {
-  const oxPairs:Array<string> = [];
-  let maxIPD_o = -1;
-  let maxIPD_x = -1;
-  let maxIPD = 0;
-  for(let o=0;o<progress.userCount;o++)
-  {
-    for(let x=o;x<progress.userCount;x++)
-    {
-      if (oxPairs.includes(`${o}_${x}`))
-      {
-        continue;
-      }
-      const IPD = instabilityPartialD(o,x);
-      // if (o!=user) IPD *= (1-progress.userLearnRate[user]);
-      // if (x==user) IPD *= 0.5;
-      if (Math.abs(IPD) > Math.abs(maxIPD))
-      {
-        maxIPD = IPD;
-        maxIPD_o = o;
-        maxIPD_x = x;
-      }
-    }
-  }
-  if(maxIPD_o>=0)
-  {
-    const dAttitude = -1/maxIPD;
-    changeAttitude(maxIPD_o,maxIPD_x,delta*dAttitude);
-    oxPairs.push(`${maxIPD_o}_${maxIPD_x}`);
-  }
+  // const ipds:Record<number,number> = {};
+  // let norm = 0;
+  // for(let o=user;o<progress.userCount;o++)
+  // {
+  //   const grad = -ipds[o]/norm;
+  // }
 }
 
 function applyChange()
@@ -168,7 +163,7 @@ export function instability(p:number,log:boolean=false)
     {
       const Gpo = rGet(p,o);
       const Gox = rGet(o,x);
-      const i = Gpx*Gpo*Gox+Gpp;
+      const i = Gpx*Gpo*Gox-Gpp;
       if(log)
       {
         console.log(`Gpo=${Gpo}`)
@@ -195,42 +190,43 @@ function instabilityPartialD(p:number,o:number)
   let d = 0;
   const Gpp = rGet(p,p);
   const Gpo = rGet(p,o);
-  // if (Gpo == 0) return 0;
   for(let x=0;x<progress.userCount;x++)
   {
     const Gox = rGet(o,x);
     const Gpx = rGet(p,x);
-    if (Gpo*Gox*Gpx+Gpp>=0) continue;
+    const i1=-Math.min(Gpo*Gox*Gpx-Gpp,0);
+    const dGpo = 0.01;
+    let i2 = 0;
+    const Gpo2 = Gpo+dGpo;
     if (x==o)
     {
       if (p==x)
       {
-        d-=3*Gpo*Gpo+1;
+        //-min(Gpo*Gpo*Gpo-Gpo,0)
+        i2=Gpo2*Gpo2*Gpo2-Gpo2;
       }
       else
       {
-        d-=2*Gox*Gpo;
+        //-min(Gox*Gpo^2-Gpp,0)
+        i2=Gox*Gpo2*Gpo2-Gpp;
       }
     }
     else
     {
       if (p==o)
       {
-        //GpoGoxGpx-Gpo^3
-        d-=Gox*Gpx+1
+        //-min(Gox*Gpx*Gpo-Gpo,0)
+        i2=Gox*Gpx*Gpo2-Gpo2;
       }
       else
       {
-        d-=Gox*Gpx;
+        //-min(Gox*Gpx*Gpo-Gpp,0)
+        i2=Gox*Gpx*Gpo2-Gpp;
       }
     }
-    // if (Gox==0) continue;
-    // const Gpx = rGet(p,x);
-    // d+=Gox*(Gpo*Gox-Gpx);
-    // d-=Gpx*Gox-Gpo;
+    i2=-Math.min(i2,0);
+    d+=(i2-i1)/dGpo;
   }
-  // const GooSub = rGet(o,o)-1;
-  // d-=Gpo*GooSub*GooSub;
   return d;
 }
 
@@ -248,7 +244,7 @@ export async function pushMsgToUser(msg:Message, user:number)
   const newInstability = instability(user);
   rSet(msg.i,msg.j,oldGij);
   const d = newInstability - oldInstability;
-  console.log(d);
+  changeAttitude(user,user,Math.abs(d)*0.01);
   const views = Math.abs(d);
   const likes = d>0?d:(Math.random()*Math.abs(d)*0.5);
   emit('viewedMessage', views);
@@ -257,22 +253,38 @@ export async function pushMsgToUser(msg:Message, user:number)
   {
     emit('messageResponsed',user,getResponse(user, msg, d))
   }
-  emit('messageGainedScore',Math.floor(views+likes));
+  emit('messageGainedScore',Math.ceil(Math.abs(d)*4));
 }
 
 export function updateUsers(delta:number)
 {
-  for(let i=0;i<progress.userCount;i++)
+  for(let p=0;p<progress.userCount;p++)
   {
-    if(progress.userType[i]!=0) continue;
-    updateUser(i,delta);
+    if(progress.userType[p]!=0) continue;
+    let maxIpo = 0;
+    let maxIpo_o = -1;
+    for(let o=p;o<progress.userCount;o++)
+    {
+      // if(progress.userType[o]!=0) continue;
+      const ipo = -instabilityPartialD(p,o);
+      if (Math.abs(ipo) > Math.abs(maxIpo))
+      {
+        maxIpo = ipo;
+        maxIpo_o = o;
+      }
+    }
+    if (maxIpo_o >= 0)
+    {
+      changeAttitude(p,maxIpo_o,delta*maxIpo);
+    }
+    // updateUser(i,delta);
   }
   applyChange();
 }
 
 export function getRepulsion(i:number, j:number):boolean
 {
-    const rij=(a:number,b:number)=>rGet(a,b)<0.5;
+    const rij=(a:number,b:number)=>Math.abs(rGet(a,b))<0.5;
     let repulsion = rij(i,j);
     if (!repulsion)
     {
@@ -296,11 +308,15 @@ export function getRepulsion(i:number, j:number):boolean
     return repulsion;
 }
 
-export function createUser(type:number,learnRate:number=0.8)
+export function createUser(type:number)
 {
     const id = progress.userCount;
     progress.userCount += 1;
     progress.userType.push(type);
+    text.userTexts.push({
+      name: type==0?userNames[id]:topicNames[id%topicNames.length],
+      prompt: ""
+    });
     progress.userAttention.push({});
     emit("createdUser",id);
 }

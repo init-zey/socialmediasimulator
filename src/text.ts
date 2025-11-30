@@ -1,6 +1,7 @@
 import { emit } from "./event"
-import { Message, progress } from "./game"
+import { Message, progress, rGet } from "./game"
 import { chat } from "./llm"
+import userNames from "./userNames"
 
 export interface UserText {
     name:string,
@@ -11,6 +12,10 @@ export interface MessageText {
     time: string,
     minimumVersion: string
 }
+
+export const topicNames = [
+    "动画综合","漫画","婆罗门","电影","主播管人","卡牌桌游","战锤","胶佬","铁道厨","VOCALOID","小马","东方","舰娘"
+]
 
 export let text:{
     userTexts:Array<UserText>,
@@ -54,8 +59,10 @@ function getUserText(id:number):UserText
 
 export function getUserName(id:number):string
 {
-    if (id<0 || id>=text.userTexts.length) return id.toString();
-    return text.userTexts[id].name
+    if (id<0 || id>=text.userTexts.length) return userNames[id%userNames.length];
+    const name = text.userTexts[id].name;
+    if (progress.userType[id]==1) return '#'+name;
+    return name;
 }
 
 function getFullUserPrompt(id:number)
@@ -155,24 +162,56 @@ export function getTimeText(time:number)
 export function getResponse(user:number, msg:Message, dInstability:number)
 {
     const d = -dInstability;
-    if (d>0.2)
+    if (d>0.5)
     {
-        return "👍";
+        return "对";
     }
-    else if (d>0.4)
+    else if (d<-0.5)
     {
-        return "🤣";
-    }
-    else if (d<-0.2)
-    {
-        return "😡";
-    }
-    else if (d<-0.4)
-    {
-        return "😅";
+        return "？";
     }
     else
     {
-        return "👀";
+        return "无感";
     }
+}
+
+export function getBubbleText(user:number,target:number,newValue:number,oldValue:number)
+{
+    if (user == target)
+    {
+        if (newValue>=0.5&&oldValue<0.5)
+        {
+            return "我们变好了";
+        }
+        else if (newValue<=0.5&&oldValue>0.5)
+        {
+            return "我们不纯粹了";
+        }
+        else if (newValue>=-0.5&&oldValue<-0.5)
+        {
+            return "我们不那么烂了";
+        }
+        else if (newValue<=-0.5&&oldValue>-0.5)
+        {
+            return "我们烂完了";
+        }
+    }
+    if (newValue>=0.5&&oldValue<0.5)
+    {
+        return getUserName(target) + "还不错";
+    }
+    else if (newValue<=0.5&&oldValue>0.5)
+    {
+        return "对" + getUserName(target) + "没兴趣";
+    }
+    else if (newValue>=-0.5&&oldValue<-0.5)
+    {
+        return "对" + getUserName(target) + "没话说";
+    }
+    else if (newValue<=-0.5&&oldValue>-0.5)
+    {
+        return "招笑" + getUserName(target);
+    }
+    return '';
 }

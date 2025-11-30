@@ -66,7 +66,7 @@ const intervalId = setInterval(()=>{
 {
     padding: 0;
 }
-@media screen and (max-width:600px) {
+/* @media screen and (max-width:600px) {
     .message-card
     {
         width: 200px;
@@ -75,5 +75,5 @@ const intervalId = setInterval(()=>{
         margin-left: 0;
         margin-right: 20px;
     }
-}
+} */
 </style>

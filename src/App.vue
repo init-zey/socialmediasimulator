@@ -2,9 +2,9 @@
 import { nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
-import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage } from './game';
+import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress } from './game';
 import { emit, subscribe } from './event';
-import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex } from 'naive-ui';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
@@ -14,6 +14,8 @@ const naiveMessage = useMessage();
 
 const searchCost = 10;
 
+const showHelp = ref(false);
+
 function load()
 {
     loadProgress();
@@ -22,8 +24,6 @@ function load()
     if (appstateSource != null)
     {
         appState.value = JSON.parse(appstateSource);
-        gameScore.value = progress.score;
-        gameTime.value = progress.time;
     }
     naiveMessage.success("已读取");
 }
@@ -31,7 +31,7 @@ function load()
 function save()
 {
     localStorage.setItem('appstate', JSON.stringify(appState.value))
-    localStorage.setItem('progress', JSON.stringify(progress));
+    saveProgress();
     localStorage.setItem('text', JSON.stringify(text));
     naiveMessage.success("已保存");
 }
@@ -45,10 +45,11 @@ onMounted(()=>{
         {
             appState.value.paused = !appState.value.paused;
             naiveMessage.info(appState.value.paused?"已暂停":"已恢复");
+            e.preventDefault();
         }
     })
     gameInit();
-    const delta = 100;
+    const delta = 10;
     setInterval(()=>{
         if (appState.value.paused||showStatistic.value) return;
         gameProcess(delta/1000);
@@ -92,23 +93,26 @@ subscribe('relationSelected', (i,j)=>
         appState.value.editingRelationship = {i,j};
     }
 });
-function collectMessage(i:number,j:number)
+function collectMessage(i:number,j:number,v:number)
 {
-    let r = -rGet(i,j);
-    if (Math.abs(r) < 0.1)
-    {
-        r = Math.random()?1:-1;
-    }
-    collectedMessage.value=createMessage(i,i,j,r)
-    progress.score -= searchCost;
-    gameScore.value = progress.score;
-    if (gameScore.value <= searchCost)
+    collectedMessage.value = undefined;
+    collectedMessage.value=createMessage(i,i,j,v)
+    score.value -= searchCost;
+}
+watch(score,(newScore)=>{
+    if (newScore <= searchCost)
     {
         gameEnded.value = true;
     }
-}
+})
 function gameProcess(delta:number)
 {
+    const lastTime = Math.floor(time.value);
+    time.value += delta;
+    if (Math.floor(time.value)-lastTime>0)
+    {
+        score.value -= 1;
+    }
     updateUsers(delta);
 }
 // function startBroadcastCollectedMessage()
@@ -134,7 +138,6 @@ function broadcastCollectedMessage()
     showEditorDrawer.value = false;
     if (collectedMessage.value == undefined) return;
     collectedMessageStatistic.value={views:0,likes:0,score:0,responses:{}};
-    gameTime.value = progress.time;
     for (let user=0;user<progress.userCount;user++)
     {
         if (progress.userType[user]!=0) continue;
@@ -148,7 +151,7 @@ function broadcastCollectedMessage()
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
     processGenerateQueue();
-}, 1000);
+}, 100);
 setInterval(() => {
     windowWidth.value = window.innerWidth;
 }, 1);
@@ -159,16 +162,13 @@ subscribe('viewedMessage',(view)=>{
 subscribe('likedMessage',(like)=>{
     collectedMessageStatistic.value.likes += like;
 });
-subscribe('messageGainedScore',(score)=>{
-    collectedMessageStatistic.value.score += score;
-    progress.score += score;
-    gameScore.value = progress.score;
+subscribe('messageGainedScore',(msgscore)=>{
+    collectedMessageStatistic.value.score += msgscore;
+    score.value += msgscore;
 });
 subscribe('messageResponsed',(author,response)=>{
     collectedMessageStatistic.value.responses[author]=response;
 });
-const gameScore = ref(progress.score);
-const gameTime = ref(0);
 const gameEnded = ref(false);
 subscribe('resetProgress', ()=>{
     appState.value={
@@ -179,61 +179,50 @@ subscribe('resetProgress', ()=>{
         focusedUser: -1
     };
     collectedMessageStatistic.value=createDefaultMessageStatistic();
-    gameTime.value = 0;
-    gameScore.value = progress.score;
     resetText();
 });
 function gameInit()
 {
-    // const size = 10;
-    // for (let g=0;g<1;g++)
-    // {
-    //     for(let i=0;i<size;i++)
-    //     {
-    //         createUser(0);
-    //     }
-    //     for(let i=0;i<size;i++)
-    //     {
-    //         for(let j=0;j<size;j++)
-    //         {
-    //             rSet(g*size+i,g*size+j,Math.random()>0.5?1:-1);
-    //             // rSet(g*size+i,g*size+j,Math.floor(Math.random()*3)-1);
-    //         }
-    //     }
-        // for(let p=3;p<size;p++)
-        // {
-        //     for(let o=0;o<3;o++)
-        //     {
-        //         rSet(g*size+p,g*size+p-1-o,Math.random()>0.5?1:-1);
-        //     }
-        //     for(let o=0;o<3;o++)
-        //     {
-        //         rSet(g*size+p,g*size+o,1);
-        //     }
-        // }
-        // for(let p=0;p<size;p++)
-        // {
-        //     rSet(g*size+p,g*size+p,1);
-        // }
-        // if (g>0)
-        // {
-        //     rSet((g-1)*size, g*size, 1);
-        // }
-    // }
+    for (let g=0;g<3;g++)
+    {
+        randomCreateTopic();
+    }
+    for (let i=0;i<progress.userCount;i++)
+    {
+        rSet(i,i,0);
+    }
+}
+function randomCreateUser()
+{
     createUser(0);
-    createUser(0);
-    createUser(0);
-    createUser(0);
-    rSet(0,1,-1);
-    rSet(0,2,-1);
-    rSet(1,2,-1);
-    rSet(0,3,1);
-    rSet(1,3,2);
-    rSet(2,3,3);
-
-    rSet(0,0,0);
-    rSet(1,1,0);
-    rSet(2,2,0);
+    let userId = progress.userCount-1;
+    rSet(userId,Math.floor(userId*Math.random()),1);
+    rSet(userId, userId, 0);
+}
+function randomCreateTopic()
+{
+    createUser(1);
+    const s = progress.userCount;
+    const size = 2+Math.ceil(Math.random()*3);
+    for(let i=0;i<size;i++)
+    {
+        createUser(0);
+        for (let j=0;j<s-1;j++)
+        {
+            if (progress.userType[j]==1)
+            {
+                rSet(s+i,j,(Math.floor(Math.random()*3)-1)*0.2);
+            }
+        }
+        rSet(s+i,s-1,1);
+    }
+    for(let i=0;i<size;i++)
+    {
+        for(let j=0;j<size;j++)
+        {
+            rSet(s+i,s+j,Math.floor(Math.random()*3)-1);
+        }
+    }
 }
 </script>
 
@@ -280,13 +269,15 @@ function gameInit()
         <n-drawer v-model:show="showEditorDrawer" :width="windowWidth>500?500:windowWidth">
             <n-drawer-content :native-scrollbar="false">
                 <template #header>
-                    <n-page-header subtitle="用户重合度" @back="showEditorDrawer=false"></n-page-header>
-                    <h1>{{ getUserName(appState.editingRelationship.i) }}↔{{ getUserName(appState.editingRelationship.j) }}={{ rGet(appState.editingRelationship.i,appState.editingRelationship.j).toFixed(2) }}</h1>
+                    <n-page-header subtitle="关系分析" @back="showEditorDrawer=false"></n-page-header>
+                    <h1>{{ getUserName(appState.editingRelationship.i) }}与{{ getUserName(appState.editingRelationship.j) }}</h1>
                 </template>
                 <div>
                     <n-flex vertical>
-                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j)">搜索反例(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
-                        <n-button v-else @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
+                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,1)">搜索正面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
+                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,-1)">搜索反面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
+                        <n-button v-if="collectedMessage!=undefined" @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
+                        <n-button v-if="collectedMessage!=undefined" @click="collectedMessage=undefined" :type="'primary'">取消</n-button>
                         <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
                             <template #action>
                             </template>
@@ -295,29 +286,40 @@ function gameInit()
                 </div>
             </n-drawer-content>
         </n-drawer>
-        <n-modal v-model:show="gameEnded" preset="card" style="margin: 60px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
-            <p>你耗尽了<Network1/>搜索点数。</p>
-            <center><n-button @click="gameEnded=false;resetProgress();gameInit();">重新开始</n-button></center>
+        <n-modal v-model:show="gameEnded" preset="card" style="width: 500px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
+            <h3>你耗尽了<n-icon><Network1/></n-icon>，让平台拥有了<n-number-animation :to="progress.userCount"/>个用户。</h3>
+            <template #action>
+                <center><n-button @click="gameEnded=false;resetProgress();gameInit();">重新开始</n-button></center>
+            </template>
         </n-modal>
         <div style="position: fixed;right: 16px;top:16px; display: flex;flex-direction: column;gap:8px">
             <n-button @click="save" :type="'primary'">保存</n-button>
             <n-button @click="load" :type="'primary'">读取</n-button>
+            <n-button @click="showHelp=!showHelp" :type="'info'">查看帮助</n-button>
         </div>
         <div class="pagebottom" style="position: absolute;bottom: 0;left: 0;right: 0;">
-            <div class="score" style="font-weight: bold;margin-top:auto">
-                <n-icon><Time/></n-icon> {{ gameTime }} <n-icon><Network1/></n-icon> <n-number-animation :to="gameScore"/>
-            </div>
-            <!-- <n-flex vertical v-if="appState.mode=='broadcast'&&collectedMessage!=undefined">
-                <MessageCard :msg="collectedMessage"/>
-                <n-space :justify="'center'">
-                    <n-button class="score" round size="large" @click="endBroadcastCollectedMessage" :disabled="appState.selectedUsers.length==0">完成</n-button>
-                    <n-button class="score" round size="large" @click="exitBroadcastCollectedMessage">取消</n-button>
-                </n-space>
-            </n-flex> -->
             <div class="buttons" style="margin-top:auto">
-                <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} space</n-button>
+                <n-button :type="'primary'" @click="randomCreateTopic();score-=200;">增加版面-200<n-icon><Network1/></n-icon></n-button>
+                <n-button :type="'primary'" @click="randomCreateUser();score-=50;">吸引用户-50<n-icon><Network1/></n-icon></n-button>
+                <div class="score" style="font-weight: bold;margin-top:auto">
+                    <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
+                </div>
+            </div>
+            <div class="buttons" style="margin-top:auto">
+                <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} Space</n-button>
             </div>
         </div>
+        <n-modal v-model:show="showHelp" style="margin: 50px; width: auto;" title="帮助" preset="card">
+            <p>我们的平台快要寿终正寝了，作为AI，做点你该做的事情。</p>
+            <p><n-icon><Network1/></n-icon>是你的<b>流量点数</b>，它是你最重要的资源，一旦耗尽，我们就没救了。</p>
+            <p>你屏幕上的圆圈是我们平台的<b>用户</b>，方块是<b>话题</b>，线条则是<b>关系</b>。</p>
+            <p><span style="color:red">红色</span>=排斥，<span style="color:blue">蓝色</span>=认可。</p>
+            <p>关系不只是两个用户之间的事情，仔细想想如果你有三个用户会发生什么：</p>
+            <p>在人类眼中，<span style="color:red">敌人</span>的<span style="color:red">敌人</span>是<span style="color:朋友">朋友</span>，<span style="color:blue">朋友</span>的<span style="color:blue">朋友</span>还是<span style="color:blue">朋友</span>。</p>
+            <p>当事实与预期出现差距时，人类就会感到不平衡。</p>
+            <p>你能花费<n-icon><Network1/></n-icon>搜索并放大两个用户群之间的极端言论，制造更多变数。变数越大，浏览越多；越让人平衡，点赞越多。浏览和点赞之和会转为<n-icon><Network1/></n-icon>。</p>
+            <p>一旦你有足够多<n-icon><Network1/></n-icon>，就可以吸引更多<b>用户</b>，甚至添加新<b>话题</b>。</p>
+        </n-modal>
 </div>
 </template>
 

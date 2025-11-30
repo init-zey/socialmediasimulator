@@ -14,7 +14,7 @@ function delay(ms:number) {
 
 export async function chat(msg:string)
 {
-    await delay(100);
+    // await delay(100);
     return msg;
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {

@@ -1,48 +1,47 @@
 <template>
 <div class="canvas"
 :style="{'background-size': 20*s+'px '+20*s+'px', 'background-position': x*s+'px '+y*s+'px'}">
-    <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel"></div>
-    <CanvasUser v-for="user in state.users" :key="user.id"
-    :id="user.id" :x="user.x" :y="user.y" :px="x" :py="y" :ps="s" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
+    <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel" @pointermove="pointerMoved"></div>
+    <CanvasUser v-for="user in users" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
+        :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
+        :style="{left: (x + user.x) * s - user.radius*0.5 + user.dx + 'px', top: (y + user.y) * s - user.radius*0.5 + user.dy + 'px', outline: (appState?.selectedUsers.includes(user.id)?'3px':'2px') + ' solid '+ (appState?.focusedUser==user.id?'#ff0':`#000`), 'border-radius': ((progress.userType[user.id]==0)?50:0)+'%', width:user.radius+'px', height:user.radius+'px'}"
     />
     <canvas id="lines"/>
 </div>
 </template>
 
 <script setup lang="ts">
-import { debugMode, getRepulsion, progress, rGet } from '../game'
+import { getRepulsion, instability, progress, rGet } from '../game'
 import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { emit, subscribe } from '../event'
 import { AppState } from '@/App.vue';
-type User = {
+export interface User {
     id: number;
     x: number;
     y: number;
+    dx: number;
+    dy: number;
     vx: number;
     vy: number;
-};
-const state:Ref<{
-    users: Array<User>
-}> = ref({
-  users: [],
-})
+    radius: number;
+}
+const users:Ref<Array<User>> = ref([]);
 
 subscribe('resetProgress',()=>{
-    state.value = {
-        users: []
-    };
+    users.value = [];
 })
 
 const appState = defineModel<AppState>();
 
-const x = ref(0);
-const y = ref(0);
+const x = ref(window.innerWidth*0.5);
+const y = ref(window.innerHeight*0.5);
 const s = ref(1);
 subscribe('userPressed', (id)=>
 {
     // if (appState.value?.mode == 'user-edit') return;
     if (appState.value == undefined) return;
+    if (progress.userType[id]!=0) return;
     let selectedUsers = appState.value.selectedUsers;
     if (appState.value?.mode == 'select-relationship')
     {
@@ -117,6 +116,7 @@ function onTouchStart(e: TouchEvent)
 
 function onTouchEnd(e: TouchEvent)
 {
+    draggingUser = -1;
     e.preventDefault();
     if (e.touches.length == 0)
     {
@@ -191,6 +191,8 @@ let bgDownButtons = 0;
 
 function onMouseup(e:any)
 {
+    console.log("mouse up");
+    draggingUser = -1;
     if (appState.value == undefined) return;
     if (bgDownButtons == 1)
     {
@@ -199,7 +201,7 @@ function onMouseup(e:any)
     }
     if (multiSelecting && Math.abs(mouseX - multiSelectStartX) > 10 && Math.abs(mouseY - multiSelectStartY) > 10)
     {
-        appState.value.selectedUsers = state.value.users.filter(user=>
+        appState.value.selectedUsers = users.value.filter(user=>
         {
             if (appState.value == undefined) return;
             const ux = (user.x + x.value) * s.value;
@@ -272,16 +274,19 @@ onMounted(()=>{
     linesCtx = linesCanvas.getContext("2d");
     setInterval(physicsProcess,delta*1000);
     subscribe("createdUser", (id:number)=>{
-        state.value.users.push({
-            id: id,
+        users.value.push({
+            id,
             x: (id % 2) * 100,
             y: Math.floor(id / 2) * 100,
+            dx: 0,
+            dy: 0,
             vx: 0,
-            vy: 0
+            vy: 0,
+            radius: 40
         });
     });
     subscribe("removedUser", ()=>{
-        state.value.users.pop();
+        users.value.pop();
     });
     subscribe("tryGetBroadcastCollectedMessageTargets", ()=>{
         if (appState.value == undefined) return;
@@ -293,11 +298,47 @@ onMounted(()=>{
 
 function physicsProcess()
 {
-    const users = state.value.users;
-    for (let i = 0; i < progress.userCount-1; i++) {
-        const a = users[i];
-        for (let j = i + 1; j < progress.userCount; j++) {
-            const b = users[j];
+    redraw();
+    for (let i = 0; i < users.value.length; i++) {
+        const a = users.value[i];
+        a.radius = 40 + 10 * rGet(a.id, a.id);
+        if (isNaN(a.radius)) a.radius = 40;
+        if (a.radius > 50) a.radius = 50;
+        if (a.radius < 30) a.radius = 30;
+        const userInstability = instability(i,false);
+        if (!appState.value?.paused && progress.userType[a.id]==0)
+        {
+            if (!isNaN(userInstability))
+            {
+                a.dx = userInstability*Math.random();
+                a.dy = userInstability*Math.random();
+                a.dx -= 2;
+                a.dy -= 2;
+                if (a.dx > 10)
+                {
+                    a.dx = 10;
+                }
+                else if (a.dx < 0)
+                {
+                    a.dx = 0;
+                }
+                if (a.dy > 10)
+                {
+                    a.dy = 10;
+                }
+                else if (a.dy < 0)
+                {
+                    a.dy = 0;
+                }
+            }
+            else
+            {
+                a.dx = Math.random() * 10;
+                a.dy = Math.random() * 10;
+            }
+        }
+        for (let j = i + 1; j < users.value.length; j++) {
+            const b = users.value[j];
             const repulsion = getRepulsion(i,j);
             let f = getForce(a.x, a.y, b.x, b.y, repulsion, repulsion?1:0.5, repulsion?0.5:0.5);
             a.vx += f.x;
@@ -306,17 +347,17 @@ function physicsProcess()
             b.vy -= f.y;
         }
     }
-    Object.values(state.value.users).forEach(user=>
-        {
-            user.vx *= 1 - (0.2 * d);
-            user.vy *= 1 - (0.2 * d);
-            user.vx -= user.x * 0.01 * d;
-            user.vy -= user.y * 0.01 * d;
-            user.x += user.vx * d;
-            user.y += user.vy * d;
-        }
+    Object.values(users.value).forEach(user=>
+    {
+        user.vx *= 1 - (0.2 * d);
+        user.vy *= 1 - (0.2 * d);
+        user.vx -= user.x * 0.01 * d;
+        user.vy -= user.y * 0.01 * d;
+        if (draggingUser == user.id) return;
+        user.x += user.vx * d;
+        user.y += user.vy * d;
+    }
     )
-    redraw();
 }
 
 function redraw()
@@ -326,21 +367,21 @@ function redraw()
     linesCanvas.height = window.innerHeight;
     for (let fromId=0;fromId<progress.userCount;fromId++)
     {
-        const from = state.value.users[fromId];
+        const from = users.value[fromId];
         if (from==undefined) continue;
         for (let toId=fromId+1;toId<progress.userCount;toId++){
-            const to = state.value.users[toId];
+            const to = users.value[toId];
             const rFT = rGet(fromId, toId);
             const rTF = rGet(fromId, toId);
             let aFT = Math.abs(rFT);
             if (aFT > 1) aFT = 1;
             if (aFT < 0) aFT = 0;
-            // if (aFT > 0.2) {aFT = 1} else {aFT=0}
+            if (aFT > 0.5) {aFT = 1} else {aFT=0}
             const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
             let aTF = Math.abs(rTF);
             if (aTF > 1) aTF = 1;
             if (aTF < 0) aTF = 0;
-            // if (aTF > 0.2) {aTF = 1} else {aTF=0}
+            if (aTF > 0.5) {aTF = 1} else {aTF=0}
             const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
             const x1 = (from.x+x.value)*s.value;
             const y1 = (from.y+y.value)*s.value;
@@ -380,7 +421,16 @@ function redraw()
         linesCtx.fill();
     }
 }
-
+let draggingUser = -1;
+function pointerMoved(e:PointerEvent)
+{
+    if (draggingUser != -1 && e.buttons==1)
+    {
+        const user = users.value[draggingUser];
+        user.x += e.movementX / s.value;
+        user.y += e.movementY / s.value;
+    }
+}
 </script>
 
 <style scoped>

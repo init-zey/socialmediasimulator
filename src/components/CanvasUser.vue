@@ -1,47 +1,54 @@
 <template>
-  <div class="canvas-user" :style="{left: (px + x) * ps - 20 + 'px', top: (py + y) * ps - 20 + 'px', outline: (selected?'2px':'1px') + ' solid '+ (focused?'#ff0':'#000'), 'border-radius': ((type==0)?50:0)+'%', width:radius+'px', height:radius+'px'}"
-  @click="onClick"
-  >
-    <!-- <div class="username"> {{ getUserName(id) }} </div> -->
-    <div class="username"> {{ getUserName(id) }},{{ userInstability.toFixed(2) }} </div>
+  <div class="canvas-user" @click="onClick">
+    <div class="username"> {{ getUserName(user.id) }} </div>
+    <div v-if="bubbleTextLife>0" class="bubble">
+      {{ bubbleText }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { emit } from '@/event';
-import { defineProps, onMounted, ref } from 'vue'
-import { NBadge } from 'naive-ui';
+import { desubscribe, emit, subscribe } from '@/event';
+import { defineProps, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getUserName } from '@/text';
-import { instability, progress, rGet } from '@/game';
+import { instability, progress } from '@/game';
+import { User } from './GameCanvas.vue';
 const props = defineProps<{
-  id: number,
-  x: number,
-  y: number,
+  user: User,
   selected: boolean,
-  focused: boolean,
-  px: number,
-  py: number,
-  ps: number
+  focused: boolean
 }>();
 function onClick()
 {
-  emit('userPressed', props.id);
+  emit('userPressed', props.user.id);
 }
-const type=progress.userType[props.id];
-const userInstability = ref(0);
-const radius = ref(40);
+const bubbleText = ref('');
+const bubbleTextLife = ref(0);
+let bubbleEvent = 0;
 onMounted(()=>{
-  // console.log('mounted');
   setInterval(()=>{
-    userInstability.value = instability(props.id,false);
-    radius.value = 40 + 10 * rGet(props.id, props.id);
+    if (bubbleTextLife.value>0)
+    {
+      bubbleTextLife.value-=10/1000;
+    }
   },10)
+  bubbleEvent = subscribe('userBubbleText',(id,bubbleTextContent)=>
+  {
+    if(id!=props.user.id||bubbleTextLife.value>0)return;
+    bubbleTextLife.value=3+Math.random()*3;
+    bubbleText.value=bubbleTextContent;
+  });
+})
+onBeforeUnmount(()=>{
+  desubscribe('userBubbleText',bubbleEvent);
 })
 </script>
 
 <style scoped>
 .canvas-user
 {
+  transition-duration: 100ms;
+  transition-property: width,height,outline;
   position: absolute;
   outline: 1px solid #000;
   background: #fff;
@@ -58,5 +65,18 @@ onMounted(()=>{
   margin: auto;
   font-weight: bold;
   text-wrap-mode: nowrap;
+}
+.bubble
+{
+  position: absolute;
+  top: -50px;
+  text-wrap-mode: nowrap;
+  text-align: center;
+  width: min-content;
+  background: #000;
+  border-radius: 3px;
+  color: white;
+  padding: 10px;
+  z-index: 998;
 }
 </style>

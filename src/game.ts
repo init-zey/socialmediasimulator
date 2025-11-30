@@ -1,4 +1,4 @@
-import { ref, Ref } from "vue";
+import { ref } from "vue";
 import { emit } from "./event";
 import { getBubbleText, getResponse, getUserName, text, topicNames } from "./text";
 import userNames from "./userNames";
@@ -11,7 +11,6 @@ export interface Progress{
   messages: Array<Message>;
   userCount: number;
   userType: Array<number>;
-  userAttention: Array<Record<number,number>>;
   userFlowTags: Array<Array<number>>;
 }
 
@@ -24,7 +23,6 @@ export let progress:Progress = {
   userGraph: {},
   messages: [],
   userType: [],
-  userAttention: [],
   userCount: 0,
   userFlowTags: []
 }
@@ -38,7 +36,6 @@ export function resetProgress()
     userGraph: {},
     messages: [],
     userType: [],
-    userAttention: [],
     userCount: 0,
     userFlowTags: []
   };
@@ -124,10 +121,14 @@ function changeAttitude(a:number, b:number, d:number):number
   const random = Math.random()>0.5;
   const i = random?a:b;
   const j = random?b:a;
-  const bubbleText = getBubbleText(i,j,rGet(i,j)+newValue,rGet(i,j)+oldValue);
-  if (bubbleText != '')
+  if (progress.userType[i]==0 && progress.userType[j]==0)
   {
-    emit('userBubbleText',i,bubbleText);
+    const bubbleText = getBubbleText(i,j,rGet(i,j)+newValue,rGet(i,j)+oldValue);
+    if (bubbleText != '')
+    {
+      emit('userBubbleText',i,bubbleText.replace('OTHER',getUserName(j)));
+      emit('userBubbleText',j,bubbleText.replace('OTHER',getUserName(i)));
+    }
   }
   return d;
 }
@@ -265,7 +266,14 @@ export function updateUsers(delta:number)
     let maxIpo_o = -1;
     for(let o=p;o<progress.userCount;o++)
     {
-      // if(progress.userType[o]!=0) continue;
+      // if(progress.userType[o]==1)
+      // {
+      //   if (Math.abs(rGet(p,o))<0.6)
+      //   {
+      //     changeAttitude(p,o,rGet(p,o)*(1-delta));
+      //     continue;
+      //   }
+      // }
       const ipo = -instabilityPartialD(p,o);
       if (Math.abs(ipo) > Math.abs(maxIpo))
       {
@@ -308,16 +316,46 @@ export function getRepulsion(i:number, j:number):boolean
     return repulsion;
 }
 
-export function createUser(type:number)
+export function createUser(type:number,name:string='',prompt:string='',randomRelationship:boolean=false)
 {
     const id = progress.userCount;
     progress.userCount += 1;
     progress.userType.push(type);
-    text.userTexts.push({
-      name: type==0?userNames[id]:topicNames[id%topicNames.length],
-      prompt: ""
-    });
-    progress.userAttention.push({});
+    if(name=='')
+    {
+      text.userTexts.push({
+        name: type==0?userNames[id]:topicNames[id%topicNames.length],
+        prompt: ''
+      });
+    }
+    else
+    {
+      text.userTexts.push({name,prompt})
+    }
+    if(randomRelationship)
+    {
+      for(let i=0;i<progress.userCount;i++)
+      {
+        if (progress.userType[i]==0)
+        {
+          const r = Math.random();
+          if (r < 0.33)
+          {
+            rSet(i,id,0.6);
+            emit('userBubbleText',i,'同感');
+          }
+          else if (r > 0.66)
+          {
+            rSet(i,id,-0.6);
+            emit('userBubbleText',i,'什么鬼');
+          }
+          else
+          {
+            emit('userBubbleText',i,'不感兴趣');
+          }
+        }
+      }
+    }
     emit("createdUser",id);
 }
 

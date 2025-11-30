@@ -1,10 +1,17 @@
 <template>
 <div class="canvas"
 :style="{'background-size': 20*s+'px '+20*s+'px', 'background-position': x*s+'px '+y*s+'px'}">
+<!-- outline: (appState?.selectedUsers.includes(user.id)?'3px':'2px') + ' solid '+ (appState?.focusedUser==user.id?'#ff0':`#000`),
+            'border-radius': ((progress.userType[user.id]==0)?50:0)+'%', -->
+    <div class="canvas-bg2" :style="{'background-size': 80*s+'px '+80*s+'px', 'background-position': x*s+'px '+y*s+'px'}"
+    ></div>
     <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel" @pointermove="pointerMoved"></div>
     <CanvasUser v-for="user in users" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
         :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
-        :style="{left: (x + user.x) * s - user.radius*0.5 + user.dx + 'px', top: (y + user.y) * s - user.radius*0.5 + user.dy + 'px', outline: (appState?.selectedUsers.includes(user.id)?'3px':'2px') + ' solid '+ (appState?.focusedUser==user.id?'#ff0':`#000`), 'border-radius': ((progress.userType[user.id]==0)?50:0)+'%', width:user.radius+'px', height:user.radius+'px'}"
+        :style="{left: (x + user.x) * s - user.radius*0.5 + user.dx + 'px', top: (y + user.y) * s - user.radius*0.5 + user.dy + 'px',
+            'font-weight': appState?.selectedUsers.includes(user.id)?'600':'300',
+            'color': appState?.focusedUser==user.id?'#ff0':`#000`,
+            width:user.radius+'px', height:user.radius+'px'}"
     />
     <canvas id="lines"/>
 </div>
@@ -16,6 +23,7 @@ import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { emit, subscribe } from '../event'
 import { AppState } from '@/App.vue';
+import { svSE } from 'naive-ui';
 export interface User {
     id: number;
     x: number;
@@ -293,6 +301,38 @@ onMounted(()=>{
         emit('getBroadcastCollectedMessageTargets',appState.value.selectedUsers);
         appState.value.selectedUsers = [];
         appState.value.focusedUser = -1;
+    });
+    window.addEventListener('keydown', (e)=>{
+        if(e.key=='a')
+        {
+            x.value += 30;
+            e.preventDefault();
+        }
+        else if(e.key=='d')
+        {
+            x.value -= 30;
+            e.preventDefault();
+        }
+        else if(e.key=='w')
+        {
+            y.value += 30;
+            e.preventDefault();
+        }
+        else if(e.key=='s')
+        {
+            y.value -= 30;
+            e.preventDefault();
+        }
+        else if(e.key=='q')
+        {
+            changeScale(window.innerWidth*0.5,window.innerHeight*0.5,0.9);
+            e.preventDefault();
+        }
+        else if(e.key=='e')
+        {
+            changeScale(window.innerWidth*0.5,window.innerHeight*0.5,1.1);
+            e.preventDefault();
+        }
     })
 });
 
@@ -441,14 +481,19 @@ function pointerMoved(e:PointerEvent)
     height: 100vh;
     scroll-behavior:unset;
     background-image:
-    linear-gradient(to right, gainsboro 1px, transparent 1px),
-    linear-gradient(to bottom, gainsboro 1px, transparent 1px);
+        linear-gradient(to right, #eeeeee, 1px, transparent 1px),
+        linear-gradient(to bottom, #eeeeee, 1px, transparent 1px);
 }
-.bg
+.canvas-bg2
 {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        linear-gradient(to right, gainsboro 1px, transparent 1px),
+        linear-gradient(to bottom, gainsboro 1px, transparent 1px);
 }
 .mouse-input-handler
 {

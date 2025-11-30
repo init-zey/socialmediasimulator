@@ -1,6 +1,6 @@
 <template>
   <div class="canvas-user" @click="onClick">
-    <div class="username"> {{ getUserName(user.id) }} </div>
+    <n-tag class="username"> {{ getUserName(user.id) }} </n-tag>
     <div v-if="bubbleTextLife>0" class="bubble">
       {{ bubbleText }}
     </div>
@@ -13,6 +13,7 @@ import { defineProps, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getUserName } from '@/text';
 import { instability, progress } from '@/game';
 import { User } from './GameCanvas.vue';
+import { NTag } from 'naive-ui';
 const props = defineProps<{
   user: User,
   selected: boolean,
@@ -47,36 +48,32 @@ onBeforeUnmount(()=>{
 <style scoped>
 .canvas-user
 {
-  transition-duration: 100ms;
-  transition-property: width,height,outline;
   position: absolute;
-  outline: 1px solid #000;
-  background: #fff;
-  color: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   user-select: none;
   -webkit-user-drag: none;
-  cursor: pointer;
 }
 .username
 {
   margin: auto;
-  font-weight: bold;
   text-wrap-mode: nowrap;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  cursor: pointer;
 }
 .bubble
 {
+  font-weight: 300;
   position: absolute;
-  top: -50px;
+  top: -40px;
   text-wrap-mode: nowrap;
   text-align: center;
   width: min-content;
   background: #000;
-  border-radius: 3px;
   color: white;
   padding: 10px;
   z-index: 998;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 90%, 54% 90%, 50% 100%, 46% 90%, 0% 90%);
 }
 </style>

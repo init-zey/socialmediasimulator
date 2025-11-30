@@ -127,10 +127,10 @@ export async function processGenerateQueue()
     const msgObj = progress.messages[msg];
     if(msgObj!=undefined)
     {
-        let describe = '不感兴趣'
-        if (msgObj.v>0.1) describe='认同';
-        if (msgObj.v<-0.1) describe='反对';
-        const content = `${msgObj.i==msgObj.a?'我':getUserName(msgObj.i)}对${msgObj.j==msgObj.a?'我自己':getUserName(msgObj.j)}${describe}。`;
+        let content = randomPick(['对OTHER不感兴趣。']);
+        if (msgObj.v>0.5) content=randomPick(['我记得OTHER，其实人品还不错','OTHER这人挺正常的','认可了@OTHER','天哪这简直就是我@OTHER']);
+        if (msgObj.v<-0.5) content=randomPick(['@OTHER 我是不是你的一辈子','OTHER也是神人了','避雷OTHER，纯纯恶心人小丑','OTHER你看看自己说的什么话，你自己笑了没。']);
+        content = content.replace('OTHER', getUserName(msgObj.j));
         const minimumVersion = await chat(getMessageMinimumVersionPrompt(content));
         text.messageTexts[msg] = {content, minimumVersion, time:getTimeText(msgObj.t)}
         emit("generatedMessage", msg, content);
@@ -182,36 +182,36 @@ export function getBubbleText(user:number,target:number,newValue:number,oldValue
     {
         if (newValue>=0.5&&oldValue<0.5)
         {
-            return "我们变好了";
+            return "变好了";
         }
         else if (newValue<=0.5&&oldValue>0.5)
         {
-            return "我们不纯粹了";
+            return "不纯粹了";
         }
         else if (newValue>=-0.5&&oldValue<-0.5)
         {
-            return "我们不那么烂了";
+            return "不烂了";
         }
         else if (newValue<=-0.5&&oldValue>-0.5)
         {
-            return "我们烂完了";
+            return "烂完了";
         }
     }
     if (newValue>=0.5&&oldValue<0.5)
     {
-        return getUserName(target) + "还不错";
+        return "接受OTHER";
     }
     else if (newValue<=0.5&&oldValue>0.5)
     {
-        return "对" + getUserName(target) + "没兴趣";
+        return "不再认可OTHER";
     }
     else if (newValue>=-0.5&&oldValue<-0.5)
     {
-        return "对" + getUserName(target) + "没话说";
+        return "不再排斥OTHER";
     }
     else if (newValue<=-0.5&&oldValue>-0.5)
     {
-        return "招笑" + getUserName(target);
+        return "排斥OTHER";
     }
     return '';
 }

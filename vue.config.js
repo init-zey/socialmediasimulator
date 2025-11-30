@@ -9,6 +9,7 @@ module.exports = defineConfig({
         changeOrigin: true,
         pathRewrite: { '^/llmapi': '' }
       }
-    }
+    },
+    title: "Social Sim"
   }
 })

@@ -4,7 +4,7 @@ import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress } from './game';
 import { emit, subscribe } from './event';
-import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard } from 'naive-ui';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NProgress } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
@@ -60,8 +60,9 @@ export interface AppState {
     mode: "select-relationship" | "broadcast";
     editingRelationship: {i:number,j:number};
     paused: boolean;
-    selectedUsers: Array<number>
-    focusedUser: number
+    selectedUsers: Array<number>;
+    focusedUser: number;
+    collectColddown: number;
 }
 
 const appState:Ref<AppState> = ref({
@@ -69,7 +70,8 @@ const appState:Ref<AppState> = ref({
     editingRelationship:{i:-1,j:-1},
     paused:true,
     selectedUsers: [],
-    focusedUser: -1
+    focusedUser: -1,
+    collectColddown: 0
 });
 
 const collectedMessage: Ref<Message|undefined> = ref(undefined);
@@ -105,13 +107,30 @@ watch(score,(newScore)=>{
         gameEnded.value = true;
     }
 })
+
+const events:Record<number,()=>void> = {
+    10: ()=>createUser(1,'年度游戏颁奖','',true)
+}
+
 function gameProcess(delta:number)
 {
     const lastTime = Math.floor(time.value);
     time.value += delta;
+    if (appState.value.collectColddown > 0)
+    {
+        appState.value.collectColddown -= delta;
+    }
     if (Math.floor(time.value)-lastTime>0)
     {
         score.value -= 1;
+        for(let eTime in events)
+        {
+            if (eTime == time.value.toFixed())
+            {
+                events[eTime]();
+                naiveMessage.info("新事件发生了！");
+            }
+        }
     }
     updateUsers(delta);
 }
@@ -147,6 +166,7 @@ function broadcastCollectedMessage()
     showStatistic.value = true;
     appState.value.paused = true;
     appState.value.mode = 'select-relationship';
+    appState.value.collectColddown = 3;
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
@@ -176,7 +196,8 @@ subscribe('resetProgress', ()=>{
         editingRelationship:{i:0,j:0},
         paused:true,
         selectedUsers: [],
-        focusedUser: -1
+        focusedUser: -1,
+        collectColddown: 0
     };
     collectedMessageStatistic.value=createDefaultMessageStatistic();
     resetText();
@@ -250,7 +271,7 @@ function randomCreateTopic()
                             <template #prefix><n-icon><ThumbsUp/></n-icon></template>
                         </n-statistic>
                     </n-col>
-                    <n-col :span="12">
+                    <n-col :span="24">
                         <n-statistic label="点数获取" :value="collectedMessageStatistic.score.toFixed()">
                             <template #prefix><n-icon><Network1/></n-icon></template>
                         </n-statistic>
@@ -273,7 +294,15 @@ function randomCreateTopic()
                     <h1>{{ getUserName(appState.editingRelationship.i) }}与{{ getUserName(appState.editingRelationship.j) }}</h1>
                 </template>
                 <div>
-                    <n-flex vertical>
+                    <center v-if="appState.collectColddown>0">
+                        <n-flex vertical>
+                            <center>
+                                <n-progress type="circle" :percentage="Math.ceil((1-appState.collectColddown/3)*100)"/>
+                            </center>
+                            冷却剩余 {{ appState.collectColddown.toFixed(1) }}s
+                        </n-flex>
+                    </center>
+                    <n-flex v-else vertical>
                         <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,1)">搜索正面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
                         <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,-1)">搜索反面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
                         <n-button v-if="collectedMessage!=undefined" @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
@@ -305,20 +334,28 @@ function randomCreateTopic()
                     <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
                 </div>
             </div>
+            <div style="margin-top: auto; font-weight: bold;">
+                <div class="score">{{appState.collectColddown>0?`冷却剩余${appState.collectColddown.toFixed(1)}s`:'消息搜索已就绪'}}</div>
+            </div>
             <div class="buttons" style="margin-top:auto">
                 <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} Space</n-button>
             </div>
         </div>
-        <n-modal v-model:show="showHelp" style="margin: 50px; width: auto;" title="帮助" preset="card">
-            <p>我们的平台快要寿终正寝了，作为AI，做点你该做的事情。</p>
+        <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
+            <p>我们的平台快要寿终正寝了，作为推送算法，我们该做点事情。</p>
             <p><n-icon><Network1/></n-icon>是你的<b>流量点数</b>，它是你最重要的资源，一旦耗尽，我们就没救了。</p>
-            <p>你屏幕上的圆圈是我们平台的<b>用户</b>，方块是<b>话题</b>，线条则是<b>关系</b>。</p>
+            <p><n-icon><Network1/></n-icon>的数量显示在左下角。</p>
+            <n-divider/>
+            <p>你屏幕上的标签都是我们平台的<b>用户</b>，此外还有<b>#话题</b>。线条则是<b>关系</b>。</p>
             <p><span style="color:red">红色</span>=排斥，<span style="color:blue">蓝色</span>=认可。</p>
-            <p>关系不只是两个用户之间的事情，仔细想想如果你有三个用户会发生什么：</p>
+            <p>一旦你有足够多<n-icon><Network1/></n-icon>，就可以吸引更多<b>用户</b>，甚至添加新<b>话题</b>。</p>
+            <n-divider/>
+            <p>关系不只是两个用户之间的事情。</p>
             <p>在人类眼中，<span style="color:red">敌人</span>的<span style="color:red">敌人</span>是<span style="color:朋友">朋友</span>，<span style="color:blue">朋友</span>的<span style="color:blue">朋友</span>还是<span style="color:blue">朋友</span>。</p>
             <p>当事实与预期出现差距时，人类就会感到不平衡。</p>
-            <p>你能花费<n-icon><Network1/></n-icon>搜索并放大两个用户群之间的极端言论，制造更多变数。变数越大，浏览越多；越让人平衡，点赞越多。浏览和点赞之和会转为<n-icon><Network1/></n-icon>。</p>
-            <p>一旦你有足够多<n-icon><Network1/></n-icon>，就可以吸引更多<b>用户</b>，甚至添加新<b>话题</b>。</p>
+            <p>大部分信息都很无聊，但你有个绝招。</p>
+            <p>你能花费<n-icon><Network1/></n-icon>搜索并放大两个用户群之间的极端言论，制造更多变数。变数越大，浏览越多；越符合观看者的预期，点赞越多。</p>
+            <p>浏览和点赞之和会转为<n-icon><Network1/></n-icon>。</p>
         </n-modal>
 </div>
 </template>
@@ -372,17 +409,22 @@ body
 }
 .pagebottom
 {
+    pointer-events: none;
     flex: 0;
     display:flex;
     justify-content:space-between;
     margin: 8px;
+}
+.pagebottom > *
+{
+    pointer-events: auto;
 }
 .score
 {
     top:auto;
     bottom:0;
     background: white;
-    /* box-shadow: 0 0 5px rgba(0,0,0,0.5); */
+    box-shadow: 0 0 3px rgba(0,0,0,0.5);
     border-radius: 20px;
     color:black;
     padding: 8px;

@@ -1,63 +1,75 @@
 {
-  "name": "vue-project",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint",
-    "deploy": "vercel --prod"
-  },
-  "dependencies": {
-    "core-js": "^3.8.3",
-    "crypto-browserify": "^3.12.1",
-    "dotenv": "^17.2.3",
-    "node-polyfill-webpack-plugin": "^4.1.0",
-    "openai": "^6.9.1",
-    "vue": "^3.2.13",
-    "vue-class-component": "^8.0.0-0",
-    "vuedraggable": "^4.1.0"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.12.16",
-    "@babel/eslint-parser": "^7.12.16",
-    "@typescript-eslint/eslint-plugin": "^5.4.0",
-    "@typescript-eslint/parser": "^5.4.0",
-    "@vicons/carbon": "^0.13.0",
-    "@vue/cli-plugin-babel": "~5.0.0",
-    "@vue/cli-plugin-eslint": "~5.0.0",
-    "@vue/cli-plugin-typescript": "~5.0.0",
-    "@vue/cli-service": "~5.0.0",
-    "@vue/eslint-config-typescript": "^9.1.0",
-    "eslint": "^7.32.0",
-    "eslint-plugin-vue": "^8.0.3",
-    "naive-ui": "^2.43.2",
-    "typescript": "^5.9.3"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
+    "app_name": "vue-project",
+    "browser": {
+        "crypto": false
     },
-    "extends": [
-      "plugin:vue/vue3-essential",
-      "eslint:recommended",
-      "@vue/typescript"
+    "browserslist": [
+        "> 1%",
+        "last 2 versions",
+        "not dead",
+        "not ie 11"
     ],
-    "parserOptions": {
-      "parser": "@typescript-eslint/parser"
+    "dependencies": {
+        "core-js": "^3.8.3",
+        "crypto-browserify": "^3.12.1",
+        "dotenv": "^17.2.3",
+        "node-polyfill-webpack-plugin": "^4.1.0",
+        "openai": "^6.9.1",
+        "vue": "^3.2.13",
+        "vue-class-component": "^8.0.0-0",
+        "vuedraggable": "^4.1.0"
     },
-    "rules": {
-      "no-unused-vars": "off"
+    "devDependencies": {
+        "@babel/core": "^7.12.16",
+        "@babel/eslint-parser": "^7.12.16",
+        "@typescript-eslint/eslint-plugin": "^5.4.0",
+        "@typescript-eslint/parser": "^5.4.0",
+        "@vicons/carbon": "^0.13.0",
+        "@vue/cli-plugin-babel": "~5.0.0",
+        "@vue/cli-plugin-eslint": "~5.0.0",
+        "@vue/cli-plugin-typescript": "~5.0.0",
+        "@vue/cli-service": "~5.0.0",
+        "@vue/eslint-config-typescript": "^9.1.0",
+        "eslint": "^7.32.0",
+        "eslint-plugin-vue": "^8.0.3",
+        "naive-ui": "^2.43.2",
+        "typescript": "^5.9.3"
+    },
+    "eslintConfig": {
+        "env": {
+            "node": true
+        },
+        "extends": [
+            "plugin:vue/vue3-essential",
+            "eslint:recommended",
+            "@vue/typescript"
+        ],
+        "parserOptions": {
+            "parser": "@typescript-eslint/parser"
+        },
+        "root": true,
+        "rules": {
+            "no-unused-vars": "off"
+        }
+    },
+    "main": "D:\\document\\osgamejam2025\\vue-project\\dist\\index.html",
+    "name": "social-media-sim",
+    "private": true,
+    "scripts": {
+        "build": "vue-cli-service build",
+        "deploy": "vercel --prod",
+        "lint": "vue-cli-service lint",
+        "serve": "vue-cli-service serve"
+    },
+    "version": "0.1.0",
+    "webkit": {},
+    "window": {
+        "frame": true,
+        "id": "vue-project",
+        "resizable": true,
+        "show": true,
+        "show_in_taskbar": true,
+        "title": "vue-project",
+        "visible": true
     }
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead",
-    "not ie 11"
-  ],
-  "browser": {
-    "crypto": false
-  }
 }

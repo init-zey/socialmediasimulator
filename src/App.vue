@@ -4,7 +4,7 @@ import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress } from './game';
 import { emit, subscribe } from './event';
-import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, AutoCompleteInst, NDynamicTags, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NProgress } from 'naive-ui';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NGrid } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
@@ -15,6 +15,7 @@ const naiveMessage = useMessage();
 const searchCost = 10;
 
 const showHelp = ref(false);
+const showStore = ref(false);
 
 function load()
 {
@@ -62,7 +63,7 @@ export interface AppState {
     paused: boolean;
     selectedUsers: Array<number>;
     focusedUser: number;
-    collectColddown: number;
+    collectedCost: Record<string, number>;
 }
 
 const appState:Ref<AppState> = ref({
@@ -71,7 +72,7 @@ const appState:Ref<AppState> = ref({
     paused:true,
     selectedUsers: [],
     focusedUser: -1,
-    collectColddown: 0
+    collectedCost: {}
 });
 
 const collectedMessage: Ref<Message|undefined> = ref(undefined);
@@ -99,7 +100,13 @@ function collectMessage(i:number,j:number,v:number)
 {
     collectedMessage.value = undefined;
     collectedMessage.value=createMessage(i,i,j,v)
-    score.value -= searchCost;
+    score.value -= searchCost*getCollectedMessageCost(i,j)
+}
+function getCollectedMessageCost(i:number,j:number):number
+{
+    const k = `${Math.min(i,j)}_${Math.max(i,j)}`;
+    if (!(k in appState.value.collectedCost)) return 1;
+    return appState.value.collectedCost[k];
 }
 watch(score,(newScore)=>{
     if (newScore <= searchCost)
@@ -108,18 +115,57 @@ watch(score,(newScore)=>{
     }
 })
 
-const events:Record<number,()=>void> = {
-    10: ()=>createUser(1,'年度游戏颁奖','',true)
+const events:Record<number,()=>string> = {
+    10: ()=>{
+        createUser(1,'年度游戏提名','',true);
+        return 'TGB发布了年度游戏提名。';
+    }
 }
+const store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()=>void}> = [
+    {
+        name:'增加版面',
+        desc:'横向扩张。',
+        effectdesc:'随机创建新一个主题，附带2-5个用户。',
+        cost:200,
+        effect: ()=>{
+            randomCreateTopic();
+        }
+    },
+    {
+        name:'吸引用户',
+        desc:'纵向扩张。',
+        effectdesc:'随机创建一个用户，附带1个认同关系。',
+        cost:50,
+        effect: ()=>{
+            randomCreateUser();
+        }
+    },
+    {
+        name:'话题争执',
+        desc:'四分之一的热爱不是一成不变的。',
+        effectdesc:'翻转25%的话题关系。',
+        cost:100,
+        effect: ()=>{
+            for(let i=0;i<progress.userCount;i++)
+            {
+                if(progress.userType[i]!=0) continue;
+                for(let j=0;j<progress.userCount;j++)
+                {
+                    if(progress.userType[i]!=1) continue;
+                    if (Math.random()<0.25)
+                    {
+                        rSet(i,j,-rGet(i,j));
+                    }
+                }
+            }
+        }
+    }
+]
 
 function gameProcess(delta:number)
 {
     const lastTime = Math.floor(time.value);
     time.value += delta;
-    if (appState.value.collectColddown > 0)
-    {
-        appState.value.collectColddown -= delta;
-    }
     if (Math.floor(time.value)-lastTime>0)
     {
         score.value -= 1;
@@ -127,8 +173,7 @@ function gameProcess(delta:number)
         {
             if (eTime == time.value.toFixed())
             {
-                events[eTime]();
-                naiveMessage.info("新事件发生了！");
+                naiveMessage.warning(events[eTime]());
             }
         }
     }
@@ -166,7 +211,15 @@ function broadcastCollectedMessage()
     showStatistic.value = true;
     appState.value.paused = true;
     appState.value.mode = 'select-relationship';
-    appState.value.collectColddown = 3;
+    const i = collectedMessage.value.i;
+    const j = collectedMessage.value.j;
+    const k = `${Math.min(i,j)}_${Math.max(i,j)}`;
+    if (!(k in appState.value.collectedCost))
+    {
+        appState.value.collectedCost[k] = 1;
+    }
+    appState.value.collectedCost[k] += 1;
+
 }
 subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
@@ -197,9 +250,10 @@ subscribe('resetProgress', ()=>{
         paused:true,
         selectedUsers: [],
         focusedUser: -1,
-        collectColddown: 0
+        collectedCost: {}
     };
     collectedMessageStatistic.value=createDefaultMessageStatistic();
+    showStore.value = false;
     resetText();
 });
 function gameInit()
@@ -293,26 +347,16 @@ function randomCreateTopic()
                     <n-page-header subtitle="关系分析" @back="showEditorDrawer=false"></n-page-header>
                     <h1>{{ getUserName(appState.editingRelationship.i) }}与{{ getUserName(appState.editingRelationship.j) }}</h1>
                 </template>
-                <div>
-                    <center v-if="appState.collectColddown>0">
-                        <n-flex vertical>
-                            <center>
-                                <n-progress type="circle" :percentage="Math.ceil((1-appState.collectColddown/3)*100)"/>
-                            </center>
-                            冷却剩余 {{ appState.collectColddown.toFixed(1) }}s
-                        </n-flex>
-                    </center>
-                    <n-flex v-else vertical>
-                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,1)">搜索正面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
-                        <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,-1)">搜索反面极端(-{{ searchCost }}<n-icon><Network1/>)</n-icon></n-button>
-                        <n-button v-if="collectedMessage!=undefined" @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
-                        <n-button v-if="collectedMessage!=undefined" @click="collectedMessage=undefined" :type="'primary'">取消</n-button>
-                        <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
-                            <template #action>
-                            </template>
-                        </MessageCard>
-                    </n-flex>
-                </div>
+                <n-flex vertical>
+                    <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,1)">搜索正面极端(-{{ searchCost*getCollectedMessageCost(appState.editingRelationship.i,appState.editingRelationship.j) }}<n-icon><Network1/>)</n-icon></n-button>
+                    <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,-1)">搜索反面极端(-{{ searchCost*getCollectedMessageCost(appState.editingRelationship.i,appState.editingRelationship.j) }}<n-icon><Network1/>)</n-icon></n-button>
+                    <n-button v-if="collectedMessage!=undefined" @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
+                    <n-button v-if="collectedMessage!=undefined" @click="collectedMessage=undefined" :type="'primary'">取消</n-button>
+                    <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
+                        <template #action>
+                        </template>
+                    </MessageCard>
+                </n-flex>
             </n-drawer-content>
         </n-drawer>
         <n-modal v-model:show="gameEnded" preset="card" style="width: 500px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
@@ -328,14 +372,14 @@ function randomCreateTopic()
         </div>
         <div class="pagebottom" style="position: absolute;bottom: 0;left: 0;right: 0;">
             <div class="buttons" style="margin-top:auto">
-                <n-button :type="'primary'" @click="randomCreateTopic();score-=200;">增加版面-200<n-icon><Network1/></n-icon></n-button>
-                <n-button :type="'primary'" @click="randomCreateUser();score-=50;">吸引用户-50<n-icon><Network1/></n-icon></n-button>
                 <div class="score" style="font-weight: bold;margin-top:auto">
-                    <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
+                    <n-flex vertical>
+                        <n-button :bordered="false" @click="showStore=true">商店页</n-button>
+                        <div>
+                            <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
+                        </div>
+                    </n-flex>
                 </div>
-            </div>
-            <div style="margin-top: auto; font-weight: bold;">
-                <div class="score">{{appState.collectColddown>0?`冷却剩余${appState.collectColddown.toFixed(1)}s`:'消息搜索已就绪'}}</div>
             </div>
             <div class="buttons" style="margin-top:auto">
                 <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} Space</n-button>
@@ -356,6 +400,28 @@ function randomCreateTopic()
             <p>大部分信息都很无聊，但你有个绝招。</p>
             <p>你能花费<n-icon><Network1/></n-icon>搜索并放大两个用户群之间的极端言论，制造更多变数。变数越大，浏览越多；越符合观看者的预期，点赞越多。</p>
             <p>浏览和点赞之和会转为<n-icon><Network1/></n-icon>。</p>
+            <p>每次进行相同的搜索，代价都会变高。</p>
+        </n-modal>
+        <n-modal v-model:show="showStore" style="margin: 50px;" title="平台策略" preset="card">
+            <n-flex :wrap="true">
+                <n-card v-for="storeItem,index in store" style="width: auto; height: auto;" :key="index">
+                    <n-thing>
+                        <template #header>
+                            {{ storeItem.name }}
+                        </template>
+                        <template #header-extra>
+                            {{ storeItem.cost }} <n-icon><Network1/></n-icon>
+                        </template>
+                        <template #description>
+                            {{ storeItem.effectdesc }}
+                        </template>
+                        {{ storeItem.desc }}
+                        <template #action>
+                            <n-button @click="score-=storeItem.cost;storeItem.effect();">购买</n-button>
+                        </template>
+                    </n-thing>
+                </n-card>
+            </n-flex>
         </n-modal>
 </div>
 </template>

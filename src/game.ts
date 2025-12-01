@@ -14,8 +14,6 @@ export interface Progress{
   userFlowTags: Array<Array<number>>;
 }
 
-let userGraphChange:Record<string, number>={};
-
 export let debugMode = false;
 
 export let progress:Progress = {
@@ -82,7 +80,7 @@ export function rGet(a:number,b:number):number
 }
 function rGetIn(a:number,b:number,G:Record<string,number>):number
 {
-  if (a>b) return rGet(b,a);
+  if (a>b) return rGetIn(b,a,G);
   const k = a.toString(32)+'_'+b.toString(32);
   if (!(k in G)) {
     return 0;
@@ -115,15 +113,14 @@ export function createMessage(a:number, i:number, j:number, v:number)
 
 function changeAttitude(a:number, b:number, d:number):number
 {
-  const oldValue=rGetIn(a,b,userGraphChange);
+  const oldValue=rGet(a,b);
   const newValue=oldValue+d;
-  rSetIn(a,b,newValue,userGraphChange);
-  const random = Math.random()>0.5;
-  const i = random?a:b;
-  const j = random?b:a;
+  rSet(a,b,newValue);
+  const i = a;
+  const j = b;
   if (progress.userType[i]==0 && progress.userType[j]==0)
   {
-    const bubbleText = getBubbleText(i,j,rGet(i,j)+newValue,rGet(i,j)+oldValue);
+    const bubbleText = getBubbleText(i,j,newValue,oldValue);
     if (bubbleText != '')
     {
       emit('userBubbleText',i,bubbleText.replace('OTHER',getUserName(j)));
@@ -143,16 +140,6 @@ function updateUser(user:number,delta:number)
   // }
 }
 
-function applyChange()
-{
-  for(const k in userGraphChange)
-  {
-    const v = userGraphChange[k];
-    progress.userGraph[k] += v;
-  }
-  userGraphChange = {};
-}
-
 export function instability(p:number,log:boolean=false)
 {
   let s = 0;
@@ -164,6 +151,7 @@ export function instability(p:number,log:boolean=false)
     {
       const Gpo = rGet(p,o);
       const Gox = rGet(o,x);
+      // const i = Gpx*Gpo*Gox-Gpp;
       const i = Gpx*Gpo*Gox-Gpp;
       if(log)
       {
@@ -262,7 +250,7 @@ export function updateUsers(delta:number)
   for(let p=0;p<progress.userCount;p++)
   {
     if(progress.userType[p]!=0) continue;
-    let maxIpo = 0;
+    let maxIpo = -1;
     let maxIpo_o = -1;
     for(let o=p;o<progress.userCount;o++)
     {
@@ -287,7 +275,7 @@ export function updateUsers(delta:number)
     }
     // updateUser(i,delta);
   }
-  applyChange();
+  // applyChange();
 }
 
 export function getRepulsion(i:number, j:number):boolean

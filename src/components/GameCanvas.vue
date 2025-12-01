@@ -199,7 +199,6 @@ let bgDownButtons = 0;
 
 function onMouseup(e:any)
 {
-    console.log("mouse up");
     draggingUser = -1;
     if (appState.value == undefined) return;
     if (bgDownButtons == 1)
@@ -345,9 +344,9 @@ function physicsProcess()
         if (isNaN(a.radius)) a.radius = 40;
         if (a.radius > 50) a.radius = 50;
         if (a.radius < 30) a.radius = 30;
-        const userInstability = instability(i,false);
-        if (!appState.value?.paused && progress.userType[a.id]==0)
+        if (progress.userType[a.id]==0)
         {
+            const userInstability = instability(i,false);
             if (!isNaN(userInstability))
             {
                 a.dx = userInstability*Math.random();
@@ -466,6 +465,7 @@ function pointerMoved(e:PointerEvent)
 {
     if (draggingUser != -1 && e.buttons==1)
     {
+        e.preventDefault();
         const user = users.value[draggingUser];
         user.x += e.movementX / s.value;
         user.y += e.movementY / s.value;

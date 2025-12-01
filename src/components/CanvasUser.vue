@@ -1,6 +1,7 @@
 <template>
   <div class="canvas-user" @click="onClick">
     <n-tag class="username"> {{ getUserName(user.id) }} </n-tag>
+    <!-- <n-tag class="username"> {{ userInstability }} </n-tag> -->
     <div v-if="bubbleTextLife>0" class="bubble">
       {{ bubbleText }}
     </div>
@@ -26,12 +27,14 @@ function onClick()
 const bubbleText = ref('');
 const bubbleTextLife = ref(0);
 let bubbleEvent = 0;
+const userInstability = ref(0);
 onMounted(()=>{
   setInterval(()=>{
     if (bubbleTextLife.value>0)
     {
       bubbleTextLife.value-=10/1000;
     }
+    userInstability.value = instability(props.user.id);
   },10)
   bubbleEvent = subscribe('userBubbleText',(id,bubbleTextContent)=>
   {

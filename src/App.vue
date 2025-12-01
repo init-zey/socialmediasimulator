@@ -447,7 +447,7 @@ function randomCreateTopic()
                         </template>
                         {{ storeItem.desc }}
                         <template #action>
-                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;">使用</n-button>
+                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;storeItem.count-=1;">使用</n-button>
                         </template>
                     </n-thing>
                 </n-card>

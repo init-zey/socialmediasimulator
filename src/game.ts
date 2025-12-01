@@ -245,7 +245,7 @@ export async function pushMsgToUser(msg:Message, user:number)
   {
     emit('messageResponsed',user,getResponse(user, msg, d))
   }
-  emit('messageGainedScore',Math.ceil((Math.abs(d)+Math.max(d,0))*4));
+  emit('messageGainedScore',Math.ceil((Math.abs(d)+Math.max(d,0)))*5);
 }
 
 export function updateUsers(delta:number)

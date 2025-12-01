@@ -349,10 +349,8 @@ function physicsProcess()
             const userInstability = instability(i,false);
             if (!isNaN(userInstability))
             {
-                a.dx = userInstability*Math.random();
-                a.dy = userInstability*Math.random();
-                a.dx -= 2;
-                a.dy -= 2;
+                a.dx = userInstability*Math.random()*2;
+                a.dy = userInstability*Math.random()*2;
                 if (a.dx > 10)
                 {
                     a.dx = 10;

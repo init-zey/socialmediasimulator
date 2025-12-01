@@ -140,6 +140,8 @@ function updateUser(user:number,delta:number)
   // }
 }
 
+const threshold = 0;
+
 export function instability(p:number,log:boolean=false)
 {
   let s = 0;
@@ -147,12 +149,12 @@ export function instability(p:number,log:boolean=false)
   for(let x=0;x<progress.userCount;x++)
   {
     const Gpx = rGet(p,x);
-    for(let o=0;o<progress.userCount;o++)
+    for(let o=x;o<progress.userCount;o++)
     {
       const Gpo = rGet(p,o);
       const Gox = rGet(o,x);
       // const i = Gpx*Gpo*Gox-Gpp;
-      const i = Gpx*Gpo*Gox-Gpp;
+      const i = Gpx*Gpo*Gox-threshold;
       if(log)
       {
         console.log(`Gpo=${Gpo}`)
@@ -177,13 +179,14 @@ export function instability(p:number,log:boolean=false)
 function instabilityPartialD(p:number,o:number)
 {
   let d = 0;
-  const Gpp = rGet(p,p);
+  // const Gpp = rGet(p,p);
   const Gpo = rGet(p,o);
   for(let x=0;x<progress.userCount;x++)
   {
     const Gox = rGet(o,x);
     const Gpx = rGet(p,x);
-    const i1=-Math.min(Gpo*Gox*Gpx-Gpp,0);
+    // const i1=-Math.min(Gpo*Gox*Gpx-Gpp,0);
+    const i1=-Math.min(Gpo*Gox*Gpx-threshold,0);
     const dGpo = 0.01;
     let i2 = 0;
     const Gpo2 = Gpo+dGpo;
@@ -191,13 +194,13 @@ function instabilityPartialD(p:number,o:number)
     {
       if (p==x)
       {
-        //-min(Gpo*Gpo*Gpo-Gpo,0)
-        i2=Gpo2*Gpo2*Gpo2-Gpo2;
+        // -min(Gpo*Gpo*Gpo-Gpo,0)
+        i2=Gpo2*Gpo2*Gpo2;
       }
       else
       {
         //-min(Gox*Gpo^2-Gpp,0)
-        i2=Gox*Gpo2*Gpo2-Gpp;
+        i2=Gox*Gpo2*Gpo2;
       }
     }
     else
@@ -205,15 +208,15 @@ function instabilityPartialD(p:number,o:number)
       if (p==o)
       {
         //-min(Gox*Gpx*Gpo-Gpo,0)
-        i2=Gox*Gpx*Gpo2-Gpo2;
+        i2=Gox*Gpx*Gpo2;
       }
       else
       {
         //-min(Gox*Gpx*Gpo-Gpp,0)
-        i2=Gox*Gpx*Gpo2-Gpp;
+        i2=Gox*Gpx*Gpo2;
       }
     }
-    i2=-Math.min(i2,0);
+    i2=-Math.min(i2-threshold,0);
     d+=(i2-i1)/dGpo;
   }
   return d;
@@ -252,7 +255,7 @@ export function updateUsers(delta:number)
     if(progress.userType[p]!=0) continue;
     let maxIpo = -1;
     let maxIpo_o = -1;
-    for(let o=p;o<progress.userCount;o++)
+    for(let o=p+1;o<progress.userCount;o++)
     {
       // if(progress.userType[o]==1)
       // {

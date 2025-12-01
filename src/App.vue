@@ -14,7 +14,7 @@ const naiveMessage = useMessage();
 
 const searchCost = 10;
 
-const showHelp = ref(true);
+const showHelp = ref(localStorage.getItem("help")==null);
 const showStore = ref(false);
 
 function load()
@@ -27,6 +27,11 @@ function load()
         appState.value = JSON.parse(appstateSource);
     }
     naiveMessage.success("已读取");
+    const storeSource = localStorage.getItem('store');
+    if (storeSource != null)
+    {
+        store = JSON.parse(storeSource);
+    }
 }
 
 function save()
@@ -35,9 +40,11 @@ function save()
     saveProgress();
     localStorage.setItem('text', JSON.stringify(text));
     naiveMessage.success("已保存");
+    localStorage.setItem('store',JSON.stringify(store));
 }
 
 onMounted(()=>{
+    localStorage.setItem("help","");
     window.addEventListener('beforeunload', ()=>{
         save();
     });
@@ -55,6 +62,9 @@ onMounted(()=>{
         if (appState.value.paused||showStatistic.value) return;
         gameProcess(delta/1000);
     },delta);
+    window.setScore = (newScore)=>{
+        score.value = newScore;
+    }
 });
 
 export interface AppState {
@@ -116,19 +126,26 @@ watch(score,(newScore)=>{
 })
 
 const events:Record<number,()=>string> = {
-    5: ()=>{
-        for (let g=0;g<3;g++)
-        {
-            randomCreateTopic();
-        }
-        return '现在整个平台对你开放。';
-    },
     20: ()=>{
         createUser(1,'年度游戏提名','',true);
         return 'TGB发布了年度游戏提名。';
     }
 }
-const store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()=>void}> = [
+let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()=>void,count:number}> = [
+    {
+        name:'接入平台',
+        desc:'当你做好准备，就使用这个。',
+        effectdesc:'初始化游戏。',
+        cost:0,
+        effect: ()=>{
+            for (let g=0;g<3;g++)
+            {
+                randomCreateTopic();
+            }
+            naiveMessage.warning("整个平台现在对你开放。");
+        },
+        count:1
+    },
     {
         name:'增加版面',
         desc:'横向扩张。',
@@ -136,7 +153,8 @@ const store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:
         cost:200,
         effect: ()=>{
             randomCreateTopic();
-        }
+        },
+        count:-1
     },
     {
         name:'吸引用户',
@@ -145,7 +163,8 @@ const store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:
         cost:50,
         effect: ()=>{
             randomCreateUser();
-        }
+        },
+        count:-1
     },
     {
         name:'话题争执',
@@ -165,7 +184,8 @@ const store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:
                     }
                 }
             }
-        }
+        },
+        count:-1
     }
 ]
 
@@ -383,7 +403,7 @@ function randomCreateTopic()
             <div class="buttons" style="margin-top:auto">
                 <div class="score" style="font-weight: bold;margin-top:auto">
                     <n-flex vertical>
-                        <n-button :bordered="false" @click="showStore=true">商店页</n-button>
+                        <n-button :bordered="false" @click="showStore=true">平台策略</n-button>
                         <div>
                             <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
                         </div>
@@ -413,20 +433,21 @@ function randomCreateTopic()
         </n-modal>
         <n-modal v-model:show="showStore" style="margin: 50px;" title="平台策略" preset="card">
             <n-flex :wrap="true">
-                <n-card v-for="storeItem,index in store" style="width: auto; height: auto;" :key="index">
+                <n-card v-for="storeItem,index in store.filter(s=>s.count!=0)" style="width: auto; height: auto;" :key="index">
                     <n-thing>
                         <template #header>
                             {{ storeItem.name }}
                         </template>
                         <template #header-extra>
-                            {{ storeItem.cost }} <n-icon><Network1/></n-icon>
+                            <p v-if="storeItem.cost>0">{{ storeItem.cost }} <n-icon><Network1/></n-icon></p>
+                            <p v-if="storeItem.count>0">剩余次数<b>{{ storeItem.count }}</b></p>
                         </template>
                         <template #description>
                             <i>{{ storeItem.effectdesc }}</i>
                         </template>
                         {{ storeItem.desc }}
                         <template #action>
-                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;">购买</n-button>
+                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;">使用</n-button>
                         </template>
                     </n-thing>
                 </n-card>

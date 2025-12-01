@@ -13,9 +13,7 @@ export interface MessageText {
     minimumVersion: string
 }
 
-export const topicNames = [
-    "动画综合","漫画","婆罗门","电影","主播管人","卡牌桌游","战锤","胶佬","铁道厨","VOCALOID","小马","东方","舰娘"
-]
+export const topicNames = ["动画综合","漫画","婆罗门","电影","主播管人","卡牌桌游","战锤","胶佬","铁道厨","VOCALOID","小马","东方","舰娘"]
 
 export let text:{
     userTexts:Array<UserText>,

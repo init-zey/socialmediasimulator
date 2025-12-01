@@ -1,9 +1,5 @@
-import { createApp, ref } from 'vue'
+import { createApp } from 'vue'
 import AppContainer from './AppContainer.vue'
-
-import { darkTheme, type GlobalTheme } from 'naive-ui'
+import {} from 'typing'
 
 createApp(AppContainer).mount('#app')
-
-const theme = ref<GlobalTheme | null>(null);
-theme.value = darkTheme;

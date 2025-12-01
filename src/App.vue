@@ -14,7 +14,7 @@ const naiveMessage = useMessage();
 
 const searchCost = 10;
 
-const showHelp = ref(false);
+const showHelp = ref(true);
 const showStore = ref(false);
 
 function load()
@@ -116,7 +116,14 @@ watch(score,(newScore)=>{
 })
 
 const events:Record<number,()=>string> = {
-    10: ()=>{
+    5: ()=>{
+        for (let g=0;g<3;g++)
+        {
+            randomCreateTopic();
+        }
+        return '现在整个平台对你开放。';
+    },
+    20: ()=>{
         createUser(1,'年度游戏提名','',true);
         return 'TGB发布了年度游戏提名。';
     }
@@ -258,14 +265,12 @@ subscribe('resetProgress', ()=>{
 });
 function gameInit()
 {
-    for (let g=0;g<3;g++)
-    {
-        randomCreateTopic();
-    }
-    for (let i=0;i<progress.userCount;i++)
-    {
-        rSet(i,i,0);
-    }
+    createUser(0);
+    createUser(0);
+    createUser(0);
+    rSet(0,1,1);
+    rSet(0,2,1);
+    rSet(1,2,1);
 }
 function randomCreateUser()
 {
@@ -297,6 +302,10 @@ function randomCreateTopic()
         {
             rSet(s+i,s+j,Math.floor(Math.random()*3)-1);
         }
+    }
+    for (let i=0;i<size;i++)
+    {
+        rSet(s+i,s+i,0);
     }
 }
 </script>

@@ -265,7 +265,7 @@ export function updateUsers(delta:number)
       //     continue;
       //   }
       // }
-      const ipo = -instabilityPartialD(p,o);
+      const ipo = -instabilityPartialD(p,o) * (rGet(p,o)>0?1:0.8);
       if (Math.abs(ipo) > Math.abs(maxIpo))
       {
         maxIpo = ipo;

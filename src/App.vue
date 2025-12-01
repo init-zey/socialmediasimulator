@@ -45,9 +45,6 @@ function save()
 
 onMounted(()=>{
     localStorage.setItem("help","");
-    window.addEventListener('beforeunload', ()=>{
-        save();
-    });
     window.addEventListener('keydown', (e)=>{
         if(e.key==' ')
         {
@@ -131,19 +128,44 @@ const events:Record<number,()=>string> = {
         return 'TGB发布了年度游戏提名。';
     }
 }
-let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()=>void,count:number}> = [
+
+const storeItemEffects: Record<string, ()=>void> = {
+    'start': ()=>{
+        for (let g=0;g<3;g++)
+        {
+            randomCreateTopic();
+        }
+        naiveMessage.warning("整个平台现在对你开放。");
+    },
+    'add-user': ()=>{
+        randomCreateUser();
+    },
+    'add-topic': ()=>{
+        randomCreateTopic();
+    },
+    'argue': ()=>{
+        for(let i=0;i<progress.userCount;i++)
+        {
+            if(progress.userType[i]!=0) continue;
+            for(let j=0;j<progress.userCount;j++)
+            {
+                if(progress.userType[i]!=1) continue;
+                if (Math.random()<0.25)
+                {
+                    rSet(i,j,-rGet(i,j));
+                }
+            }
+        }
+    }
+}
+
+let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:string,count:number}> = [
     {
         name:'接入平台',
         desc:'当你做好准备，就使用这个。',
         effectdesc:'初始化游戏。',
         cost:0,
-        effect: ()=>{
-            for (let g=0;g<3;g++)
-            {
-                randomCreateTopic();
-            }
-            naiveMessage.warning("整个平台现在对你开放。");
-        },
+        effect: 'start',
         count:1
     },
     {
@@ -151,9 +173,7 @@ let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()
         desc:'横向扩张。',
         effectdesc:'随机创建新一个主题，附带2-5个用户。',
         cost:200,
-        effect: ()=>{
-            randomCreateTopic();
-        },
+        effect: 'add-topic',
         count:-1
     },
     {
@@ -161,9 +181,7 @@ let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()
         desc:'纵向扩张。',
         effectdesc:'随机创建一个用户，附带1个认同关系。',
         cost:50,
-        effect: ()=>{
-            randomCreateUser();
-        },
+        effect: 'add-user',
         count:-1
     },
     {
@@ -171,20 +189,7 @@ let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:()
         desc:'四分之一的热爱不是一成不变的。',
         effectdesc:'翻转25%的话题关系。',
         cost:100,
-        effect: ()=>{
-            for(let i=0;i<progress.userCount;i++)
-            {
-                if(progress.userType[i]!=0) continue;
-                for(let j=0;j<progress.userCount;j++)
-                {
-                    if(progress.userType[i]!=1) continue;
-                    if (Math.random()<0.25)
-                    {
-                        rSet(i,j,-rGet(i,j));
-                    }
-                }
-            }
-        },
+        effect: 'argue',
         count:-1
     }
 ]
@@ -447,7 +452,7 @@ function randomCreateTopic()
                         </template>
                         {{ storeItem.desc }}
                         <template #action>
-                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;storeItem.count-=1;">使用</n-button>
+                            <n-button @click="score-=storeItem.cost;storeItemEffects[storeItem.effect]();showStore=false;storeItem.count-=1;">使用</n-button>
                         </template>
                     </n-thing>
                 </n-card>

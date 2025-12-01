@@ -413,11 +413,11 @@ function randomCreateTopic()
                             {{ storeItem.cost }} <n-icon><Network1/></n-icon>
                         </template>
                         <template #description>
-                            {{ storeItem.effectdesc }}
+                            <i>{{ storeItem.effectdesc }}</i>
                         </template>
-                        {{ storeItem.desc }}
+                        <{{ storeItem.desc }}
                         <template #action>
-                            <n-button @click="score-=storeItem.cost;storeItem.effect();">购买</n-button>
+                            <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;">购买</n-button>
                         </template>
                     </n-thing>
                 </n-card>

@@ -415,7 +415,7 @@ function randomCreateTopic()
                         <template #description>
                             <i>{{ storeItem.effectdesc }}</i>
                         </template>
-                        <{{ storeItem.desc }}
+                        {{ storeItem.desc }}
                         <template #action>
                             <n-button @click="score-=storeItem.cost;storeItem.effect();showStore=false;">购买</n-button>
                         </template>

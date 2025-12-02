@@ -517,7 +517,6 @@ body
 {
     margin: 0;
     overflow: hidden;
-    position: fixed;
     user-select: none;
 }
 

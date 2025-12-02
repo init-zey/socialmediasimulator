@@ -328,7 +328,12 @@ function randomCreateUser()
 {
     createUser(0);
     let userId = progress.userCount-1;
-    rSet(userId,Math.floor(userId*Math.random()),1);
+    let r = Math.floor(Math.random()*userId);
+    while (progress.userType[r]!=0)
+    {
+        r = Math.floor(Math.random()*userId);
+    }
+    rSet(userId,r,1);
     rSet(userId, userId, 0);
 }
 function randomCreateTopic()

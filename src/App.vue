@@ -376,6 +376,7 @@ function randomCreateTopic()
             <StatusBar/>
         </template>
         <n-space vertical justify="space-between" style="width: 100%;">
+            <n-page-header subtitle="新消息" @back="showStatistic=false"></n-page-header>
             <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
                 <template #suffix>
                     <n-space style="margin: 0">
@@ -477,7 +478,7 @@ function randomCreateTopic()
             <div style="margin:auto;color:gainsboro">
                 <a style="color:gainsboro;text-decoration: none;" href="https://github.com/init-zey/socialmediasimulator">社媒算法模拟器</a>@吉士蛋麦芬三明治
             </div>
-            <n-button style="margin: auto;" size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
+            <n-button style="margin-top: auto;margin-bottom: auto;" size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
             <p>我们的平台快要寿终正寝了，作为推送算法，我们该做点事情。</p>

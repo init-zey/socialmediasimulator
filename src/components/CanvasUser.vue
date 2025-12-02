@@ -65,15 +65,15 @@ onBeforeUnmount(()=>{
   background-image: url("../assets/NameTag.png");
   background-size: cover;
   color: white;
-  padding-left: 15px;
-  padding-right: 15px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 .bubble
 {
   font-weight: 300;
   position: absolute;
   top: -40px;
-  text-wrap-mode: nowrap;
+  white-space: nowrap;
   text-align: center;
   width: min-content;
   background: #000;

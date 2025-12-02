@@ -6,5 +6,5 @@
 
 <script setup>
 import App from './App.vue';
-import { NMessageProvider } from 'naive-ui';
+import { NMessageProvider, NConfigProvider, darkTheme } from 'naive-ui';
 </script>

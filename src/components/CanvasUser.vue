@@ -1,6 +1,6 @@
 <template>
   <div class="canvas-user" @click="onClick">
-    <n-tag class="username"> {{ getUserName(user.id) }} </n-tag>
+    <span class="username"> {{ getUserName(user.id) }} </span>
     <!-- <n-tag class="username"> {{ userInstability }} </n-tag> -->
     <div v-if="bubbleTextLife>0" class="bubble">
       {{ bubbleText }}
@@ -12,9 +12,7 @@
 import { desubscribe, emit, subscribe } from '@/event';
 import { defineProps, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getUserName } from '@/text';
-import { instability, progress } from '@/game';
 import { User } from './GameCanvas.vue';
-import { NTag } from 'naive-ui';
 const props = defineProps<{
   user: User,
   selected: boolean,
@@ -64,6 +62,11 @@ onBeforeUnmount(()=>{
   text-wrap-mode: nowrap;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   cursor: pointer;
+  background-image: url("../assets/NameTag.png");
+  background-size: cover;
+  color: white;
+  padding-left: 15px;
+  padding-right: 15px;
 }
 .bubble
 {

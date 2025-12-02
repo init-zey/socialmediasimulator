@@ -10,9 +10,8 @@
         :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
         :style="{left: calcX(user) + 'px', top: calcY(user) + 'px',
             'font-weight': appState?.selectedUsers.includes(user.id)?'600':'300',
-            'color': appState?.focusedUser==user.id?'#ff0':`#000`,
             'opacity': progress.userLife[user.id]<0?1:progress.userLife[user.id],
-            width:user.radius+'px', height:user.radius+'px'}"
+            width:user.radius+'px', height:user.radius+'px', 'transform': `rotate(${user.a}deg)`}"
     />
     <canvas id="lines"/>
 </div>
@@ -46,6 +45,8 @@ export interface User {
     dy: number;
     vx: number;
     vy: number;
+    va: number;
+    a: number;
     radius: number;
 }
 const users:Ref<Array<User>> = ref([]);
@@ -303,6 +304,8 @@ onMounted(()=>{
             dy: 0,
             vx: 0,
             vy: 0,
+            va: 0,
+            a: 0,
             radius: 40
         });
     });
@@ -402,8 +405,15 @@ function physicsProcess()
     {
         user.vx *= 1 - (0.2 * d);
         user.vy *= 1 - (0.2 * d);
-        user.vx -= user.x * 0.01 * d;
-        user.vy -= user.y * 0.01 * d;
+        // user.vx -= user.x * 0.01 * d;
+        // user.vy -= user.y * 0.01 * d;
+        user.va -= user.vx * 0.05 * d;
+        user.a += user.va * d;
+        user.va *= 1-0.5*d;
+        if (Math.abs(user.a) > 5)
+        {
+            user.a *= 1-0.1*d;
+        }
         if (draggingUser == user.id) return;
         user.x += user.vx * d;
         user.y += user.vy * d;
@@ -432,13 +442,14 @@ function redraw()
             if (aFT < 0) aFT = 0;
             if (aFT > 0.5) {aFT = 1} else {aFT=0}
             aFT *= opacity;
-            const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
+            const minColorValue = '22';
+            const styleFT = `#${(rFT<0)?'ff':'00'}${minColorValue}${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
             let aTF = Math.abs(rTF);
             if (aTF > 1) aTF = 1;
             if (aTF < 0) aTF = 0;
             if (aTF > 0.5) {aTF = 1} else {aTF=0}
             aTF *= opacity;
-            const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
+            const styleTF = `#${(rTF<0)?'ff':'00'}${minColorValue}${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
             const x1 = (from.x+x.value)*s.value;
             const y1 = (from.y+y.value)*s.value;
             const x2 = (to.x+x.value)*s.value;
@@ -448,6 +459,7 @@ function redraw()
             grd.addColorStop(1,styleTF);
             linesCtx.strokeStyle = grd;
             linesCtx.beginPath();
+            linesCtx.setLineDash([10, 3]);
             linesCtx.moveTo(x1, y1);
             linesCtx.lineTo(x2, y2);
             linesCtx.stroke();

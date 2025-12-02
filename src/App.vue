@@ -4,7 +4,7 @@ import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
 import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress, hasRelationship } from './game';
 import { emit, subscribe } from './event';
-import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NProgress } from 'naive-ui';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NProgress, NConfigProvider, darkTheme } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
@@ -50,6 +50,7 @@ onMounted(()=>{
         if(e.key==' ')
         {
             appState.value.paused = !appState.value.paused;
+            emit('missionProceed','start3',1);
             naiveMessage.info(appState.value.paused?"已暂停":"已恢复");
             e.preventDefault();
         }
@@ -364,35 +365,44 @@ function randomCreateTopic()
 <template>
 <div class="app">
     <GameCanvas v-model="appState" ref="canvas"/>
-    <n-modal v-model:show="showStatistic" preset="card" style="margin: 60px;" :title="`数据统计`" size="huge" :bordered="false"
+    <div :class="appState.paused?'vintage vintage-paused':'vintage'"></div>
+    <n-modal v-model:show="showStatistic" preset="card" style="max-width: 375px;min-height: 667px;" size="huge" :bordered="false"
         @update-show="(show)=>{if(!show){}}"
+        :closable="false"
+        :header-style="{padding:0}"
+        :content-style="{display:'flex'}"
     >
-        <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
-            <template #suffix>
-                <n-space>
-                    <n-tag v-for="response,author in collectedMessageStatistic.responses" :key="author" round>
-                            {{getUserName(author)}} {{ response }}
-                    </n-tag>
-                </n-space>
-                <n-row>
-                    <n-col :span="12">
-                        <n-statistic label="浏览" :value="(collectedMessageStatistic.views*1000).toFixed()">
-                            <template #prefix><n-icon><View/></n-icon></template>
-                        </n-statistic>
-                    </n-col>
-                    <n-col :span="12">
-                        <n-statistic label="点赞" :value="(collectedMessageStatistic.likes*Math.max(Math.random(),0.5)*1000).toFixed()">
-                            <template #prefix><n-icon><ThumbsUp/></n-icon></template>
-                        </n-statistic>
-                    </n-col>
-                    <n-col :span="24">
-                        <n-statistic label="点数获取" :value="collectedMessageStatistic.score.toFixed()">
-                            <template #prefix><n-icon><Network1/></n-icon></template>
-                        </n-statistic>
-                    </n-col>
-                </n-row>
-            </template>
-        </MessageCard>
+        <template #header>
+            <StatusBar/>
+        </template>
+        <n-space vertical justify="space-between" style="width: 100%;">
+            <MessageCard v-if="collectedMessage!=undefined" :msg="collectedMessage">
+                <template #suffix>
+                    <n-space style="margin: 0">
+                        <n-tag v-for="response,author in collectedMessageStatistic.responses" :key="author" round>
+                                {{getUserName(author)}} {{ response }}
+                        </n-tag>
+                    </n-space>
+                </template>
+            </MessageCard>
+            <n-row>
+                <n-col :span="12">
+                    <n-statistic label="浏览" :value="(collectedMessageStatistic.views*1000).toFixed()">
+                        <template #prefix><n-icon><View/></n-icon></template>
+                    </n-statistic>
+                </n-col>
+                <n-col :span="12">
+                    <n-statistic label="点赞" :value="(collectedMessageStatistic.likes*Math.max(Math.random(),0.5)*1000).toFixed()">
+                        <template #prefix><n-icon><ThumbsUp/></n-icon></template>
+                    </n-statistic>
+                </n-col>
+                <n-col :span="24">
+                    <n-statistic label="点数获取" :value="collectedMessageStatistic.score.toFixed()">
+                        <template #prefix><n-icon><Network1/></n-icon></template>
+                    </n-statistic>
+                </n-col>
+            </n-row>
+        </n-space>
     </n-modal>
     <!-- <MessageList class="mainFlow" v-model:label="text.flowLabel[0]" :source="" :flow="0">
         <template #prefix>
@@ -455,20 +465,16 @@ function randomCreateTopic()
                 <n-button @click="showHelp=!showHelp" :type="'info'">查看帮助</n-button>
             </div>
         </div>
-        <div class="pageside" style="position: absolute;bottom: 0;left: 0;right: 0;">
+        <div class="pageside" style="position:absolute;bottom: 0;left: 0;right: 0;background: white; color:black; margin:0; box-shadow: 0 0 3px rgba(1,1,1,0.3);padding: 0.5em;">
             <div class="buttons" style="margin-top:auto">
-                <div class="score" style="font-weight: bold;margin-top:auto">
-                    <n-flex vertical>
-                        <n-button :bordered="false" @click="showStore=true">平台策略</n-button>
-                        <div>
-                            <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
-                        </div>
-                    </n-flex>
-                </div>
+                <n-flex>
+                    <n-button size="large" @click="showStore=true">平台策略</n-button>
+                    <div style="margin: auto;">
+                        <n-icon><Time/></n-icon> {{ time.toFixed() }} <n-icon><Network1/></n-icon> {{score }}
+                    </div>
+                </n-flex>
             </div>
-            <div class="buttons" style="margin-top:auto">
-                <n-button class="score" round size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
-            </div>
+            <n-button size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
             <p>我们的平台快要寿终正寝了，作为推送算法，我们该做点事情。</p>
@@ -620,5 +626,25 @@ html, body
 #app
 {
     position: fixed;
+}
+.vintage {
+    transition-property: opacity;
+    transition-duration: 500ms;
+    background-image:
+    radial-gradient(
+      circle at center,
+      transparent 70%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    box-shadow: 
+    inset 0 0 30px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.5;
+}
+.vintage-paused {
+    opacity: 1.0;
 }
 </style>

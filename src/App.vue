@@ -615,6 +615,10 @@ html, body
     border-radius: 20px;
     color:black;
     padding: 1em;
-    text-wrap-mode: nowrap;
+    margin-right: 1em;
+}
+#app
+{
+    position: fixed;
 }
 </style>

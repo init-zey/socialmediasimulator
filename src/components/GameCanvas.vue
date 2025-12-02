@@ -6,9 +6,9 @@
     <div class="canvas-bg2" :style="{'background-size': 80*s+'px '+80*s+'px', 'background-position': x*s+'px '+y*s+'px'}"
     ></div>
     <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel" @pointermove="pointerMoved"></div>
-    <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id))" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
+    <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id)&&isUserInWindow(user))" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
         :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
-        :style="{left: (x + user.x) * s - user.radius*0.5 + user.dx + 'px', top: (y + user.y) * s - user.radius*0.5 + user.dy + 'px',
+        :style="{left: calcX(user) + 'px', top: calcY(user) + 'px',
             'font-weight': appState?.selectedUsers.includes(user.id)?'600':'300',
             'color': appState?.focusedUser==user.id?'#ff0':`#000`,
             'opacity': progress.userLife[user.id]<0?1:progress.userLife[user.id],
@@ -24,7 +24,20 @@ import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { emit, subscribe } from '../event'
 import { AppState } from '@/App.vue';
-import { svSE } from 'naive-ui';
+function calcX(user:User)
+{
+    return (x.value + user.x) * s.value - user.radius*0.5 + user.dx;
+}
+function calcY(user:User)
+{
+    return (y.value + user.y) * s.value - user.radius*0.5 + user.dy;
+}
+function isUserInWindow(user:User)
+{
+    const scrX = calcX(user);
+    const scrY = calcY(user);
+    return scrX > 0 && scrX < window.innerWidth && scrY > 0 && scrY < window.innerHeight;
+}
 export interface User {
     id: number;
     x: number;

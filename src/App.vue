@@ -2,13 +2,14 @@
 import { nextTick, onMounted, Ref, ref, watch } from 'vue';
 import GameCanvas from './components/GameCanvas.vue';
 import MessageCard from './components/MessageCard.vue';
-import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress } from './game';
+import { createUser, Message, progress, rSet, updateUsers, resetProgress, loadProgress, pushMsgToUser, rGet, createMessage, score, time, saveProgress, hasRelationship } from './game';
 import { emit, subscribe } from './event';
-import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NGrid } from 'naive-ui';
+import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NProgress } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
 import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
 import StatusBar from './components/StatusBar.vue';
+import { missions } from './mission';
 
 const naiveMessage = useMessage();
 
@@ -62,6 +63,26 @@ onMounted(()=>{
     window.setScore = (newScore)=>{
         score.value = newScore;
     }
+    subscribe('missionProceed', (mission, progress)=>{
+        if (appState.value.missionProgress[mission]==-1) return;
+        if (mission in appState.value.missionProgress && appState.value.missionProgress[mission]>=0)
+        {
+            appState.value.missionProgress[mission] += progress;
+        }
+    });
+    subscribe('addMission', (mission)=>{
+        if (!(mission in appState.value.missionProgress))
+        {
+            appState.value.missionProgress[mission] = 0;
+            appState.value.missionCount += 1;
+        }
+    });
+    subscribe('addStoreItem', (storeItem)=>{
+        store.push(storeItem);
+    });
+    subscribe('addScore', (score)=>{
+
+    })
 });
 
 export interface AppState {
@@ -71,6 +92,8 @@ export interface AppState {
     selectedUsers: Array<number>;
     focusedUser: number;
     collectedCost: Record<string, number>;
+    missionProgress: Record<string, number>;
+    missionCount: number;
 }
 
 const appState:Ref<AppState> = ref({
@@ -79,7 +102,9 @@ const appState:Ref<AppState> = ref({
     paused:true,
     selectedUsers: [],
     focusedUser: -1,
-    collectedCost: {}
+    collectedCost: {},
+    missionProgress: {'start1':0},
+    missionCount: 1
 });
 
 const collectedMessage: Ref<Message|undefined> = ref(undefined);
@@ -101,6 +126,11 @@ subscribe('relationSelected', (i,j)=>
         showEditorDrawer.value = true;
         collectedMessage.value = undefined;
         appState.value.editingRelationship = {i,j};
+        emit('missionProceed','start1',1);
+        if (appState.value.missionProgress['start1']==1)
+        {
+            showEditorDrawer.value = false;
+        }
     }
 });
 function collectMessage(i:number,j:number,v:number)
@@ -122,9 +152,9 @@ watch(score,(newScore)=>{
     }
 })
 
-const events:Record<number,()=>string> = {
-    20: ()=>{
-        createUser(1,'年度游戏提名','',true);
+const timedEvents:Record<number,()=>string> = {
+    10: ()=>{
+        createUser(1,'年度游戏提名','',true,5);
         return 'TGB发布了年度游戏提名。';
     }
 }
@@ -135,6 +165,7 @@ const storeItemEffects: Record<string, ()=>void> = {
         {
             randomCreateTopic();
         }
+        emit('missionProceed','start4',1)
         naiveMessage.warning("整个平台现在对你开放。");
     },
     'add-user': ()=>{
@@ -160,14 +191,6 @@ const storeItemEffects: Record<string, ()=>void> = {
 }
 
 let store:Array<{cost:number,name:string,desc:string,effectdesc:string,effect:string,count:number}> = [
-    {
-        name:'接入平台',
-        desc:'当你做好准备，就使用这个。',
-        effectdesc:'初始化游戏。',
-        cost:0,
-        effect: 'start',
-        count:1
-    },
     {
         name:'增加版面',
         desc:'横向扩张。',
@@ -201,11 +224,11 @@ function gameProcess(delta:number)
     if (Math.floor(time.value)-lastTime>0)
     {
         score.value -= 1;
-        for(let eTime in events)
+        for(let eTime in timedEvents)
         {
             if (eTime == time.value.toFixed())
             {
-                naiveMessage.warning(events[eTime]());
+                naiveMessage.warning(timedEvents[eTime]());
             }
         }
     }
@@ -270,6 +293,7 @@ subscribe('likedMessage',(like)=>{
 subscribe('messageGainedScore',(msgscore)=>{
     collectedMessageStatistic.value.score += msgscore;
     score.value += msgscore;
+    emit('missionProceed', 'start2', msgscore);
 });
 subscribe('messageResponsed',(author,response)=>{
     collectedMessageStatistic.value.responses[author]=response;
@@ -282,7 +306,9 @@ subscribe('resetProgress', ()=>{
         paused:true,
         selectedUsers: [],
         focusedUser: -1,
-        collectedCost: {}
+        collectedCost: {},
+        missionProgress: {'start1':0},
+        missionCount: 1,
     };
     collectedMessageStatistic.value=createDefaultMessageStatistic();
     showStore.value = false;
@@ -381,7 +407,7 @@ function randomCreateTopic()
                     <n-page-header subtitle="关系分析" @back="showEditorDrawer=false"></n-page-header>
                     <h1>{{ getUserName(appState.editingRelationship.i) }}与{{ getUserName(appState.editingRelationship.j) }}</h1>
                 </template>
-                <n-flex vertical>
+                <n-flex v-if="hasRelationship(appState.editingRelationship.i,appState.editingRelationship.j)" vertical>
                     <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,1)">搜索正面极端(-{{ searchCost*getCollectedMessageCost(appState.editingRelationship.i,appState.editingRelationship.j) }}<n-icon><Network1/>)</n-icon></n-button>
                     <n-button v-if="collectedMessage==undefined" @click="collectMessage(appState.editingRelationship.i,appState.editingRelationship.j,-1)">搜索反面极端(-{{ searchCost*getCollectedMessageCost(appState.editingRelationship.i,appState.editingRelationship.j) }}<n-icon><Network1/>)</n-icon></n-button>
                     <n-button v-if="collectedMessage!=undefined" @click="broadcastCollectedMessage" :type="'primary'">推送</n-button>
@@ -391,6 +417,9 @@ function randomCreateTopic()
                         </template>
                     </MessageCard>
                 </n-flex>
+                <div v-else>
+                    无可用关系
+                </div>
             </n-drawer-content>
         </n-drawer>
         <n-modal v-model:show="gameEnded" preset="card" style="width: 500px;" :title="`游戏结束`" size="huge" :bordered="false" :mask-closable=false>
@@ -399,12 +428,34 @@ function randomCreateTopic()
                 <center><n-button @click="gameEnded=false;resetProgress();gameInit();">重新开始</n-button></center>
             </template>
         </n-modal>
-        <div style="position: fixed;right: 16px;top:16px; display: flex;flex-direction: column;gap:8px">
-            <n-button @click="save" :type="'primary'">保存</n-button>
-            <n-button @click="load" :type="'primary'">读取</n-button>
-            <n-button @click="showHelp=!showHelp" :type="'info'">查看帮助</n-button>
+        <div class="pageside" style="position: absolute;top: 0;left: 0;right: 0;">
+            <n-space class="missions" style="margin-bottom: auto;" vertical>
+                <b>任务列表</b>
+                <div v-if="appState.missionCount>0">
+                    <n-space v-for="missionProgress,mission in appState.missionProgress" :key="mission">
+                        <div v-if="missionProgress!=-1">
+                            <p>
+                                <b>{{ missions[mission].title }}</b>
+                                {{ missions[mission].desc }}
+                                <n-button type="warning" @click="appState.missionProgress[mission]=-1;appState.missionCount-=1;missions[mission].reward()" v-if="missionProgress>=missions[mission].maxProgress">完成</n-button>
+                            </p>
+                            <n-progress type="line" :percentage="Math.floor((missionProgress/missions[mission].maxProgress)*100)">
+                                {{ missionProgress }}/{{ missions[mission].maxProgress }}
+                            </n-progress>
+                        </div>
+                    </n-space>
+                </div>
+                <div v-else>
+                    无任务
+                </div>
+            </n-space>
+            <div class="buttons">
+                <n-button @click="save" :type="'primary'">保存</n-button>
+                <n-button @click="load" :type="'primary'">读取</n-button>
+                <n-button @click="showHelp=!showHelp" :type="'info'">查看帮助</n-button>
+            </div>
         </div>
-        <div class="pagebottom" style="position: absolute;bottom: 0;left: 0;right: 0;">
+        <div class="pageside" style="position: absolute;bottom: 0;left: 0;right: 0;">
             <div class="buttons" style="margin-top:auto">
                 <div class="score" style="font-weight: bold;margin-top:auto">
                     <n-flex vertical>
@@ -416,7 +467,7 @@ function randomCreateTopic()
                 </div>
             </div>
             <div class="buttons" style="margin-top:auto">
-                <n-button class="score" round size="large" @click="appState.paused=!appState.paused">{{appState.paused?'继续':'暂停'}} Space</n-button>
+                <n-button class="score" round size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
             </div>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
@@ -508,7 +559,7 @@ body
     display: flex;
     flex-direction: column;
 }
-.pagebottom
+.pageside
 {
     pointer-events: none;
     flex: 0;
@@ -516,7 +567,7 @@ body
     justify-content:space-between;
     margin: 8px;
 }
-.pagebottom > *
+.pageside > *
 {
     pointer-events: auto;
 }
@@ -556,5 +607,14 @@ body
         height: 100%;
         flex-wrap: wrap;
     }
+}
+.missions
+{
+    background: white;
+    box-shadow: 0 0 3px rgba(0,0,0,0.5);
+    border-radius: 20px;
+    color:black;
+    padding: 1em;
+    text-wrap-mode: nowrap;
 }
 </style>

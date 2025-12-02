@@ -6,11 +6,12 @@
     <div class="canvas-bg2" :style="{'background-size': 80*s+'px '+80*s+'px', 'background-position': x*s+'px '+y*s+'px'}"
     ></div>
     <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel" @pointermove="pointerMoved"></div>
-    <CanvasUser v-for="user in users" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
+    <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id))" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
         :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
         :style="{left: (x + user.x) * s - user.radius*0.5 + user.dx + 'px', top: (y + user.y) * s - user.radius*0.5 + user.dy + 'px',
             'font-weight': appState?.selectedUsers.includes(user.id)?'600':'300',
             'color': appState?.focusedUser==user.id?'#ff0':`#000`,
+            'opacity': progress.userLife[user.id]<0?1:progress.userLife[user.id],
             width:user.radius+'px', height:user.radius+'px'}"
     />
     <canvas id="lines"/>
@@ -18,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { getRepulsion, instability, progress, rGet } from '../game'
+import { getRepulsion, instability, progress, rGet, userAvaliable } from '../game'
 import { defineModel, onMounted, Ref, ref } from 'vue'
 import CanvasUser from './CanvasUser.vue'
 import { emit, subscribe } from '../event'
@@ -404,21 +405,26 @@ function redraw()
     linesCanvas.height = window.innerHeight;
     for (let fromId=0;fromId<progress.userCount;fromId++)
     {
+        if(!userAvaliable(fromId)) continue;
         const from = users.value[fromId];
         if (from==undefined) continue;
         for (let toId=fromId+1;toId<progress.userCount;toId++){
+            if(!userAvaliable(toId)) continue;
             const to = users.value[toId];
             const rFT = rGet(fromId, toId);
             const rTF = rGet(fromId, toId);
+            const opacity = (progress.userLife[fromId]<0?1:Math.min(progress.userLife[fromId],1)) * (progress.userLife[toId]<0?1:Math.min(progress.userLife[toId],1));
             let aFT = Math.abs(rFT);
             if (aFT > 1) aFT = 1;
             if (aFT < 0) aFT = 0;
             if (aFT > 0.5) {aFT = 1} else {aFT=0}
+            aFT *= opacity;
             const styleFT = `#${(rFT<0)?'ff':'00'}00${(rFT>=0)?'ff':'00'}${Math.floor(aFT*255).toString(16).padStart(2,'0')}`;
             let aTF = Math.abs(rTF);
             if (aTF > 1) aTF = 1;
             if (aTF < 0) aTF = 0;
             if (aTF > 0.5) {aTF = 1} else {aTF=0}
+            aTF *= opacity;
             const styleTF = `#${(rTF<0)?'ff':'00'}00${(rTF>=0)?'ff':'00'}${Math.floor(aTF*255).toString(16).padStart(2,'0')}`;
             const x1 = (from.x+x.value)*s.value;
             const y1 = (from.y+y.value)*s.value;

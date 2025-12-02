@@ -6,11 +6,12 @@ import userNames from "./userNames";
 export interface Message {id:number, a:number, i:number, j:number, v:number, t:number}
 
 export interface Progress{
-  userMemory: Record<number, Array<number>>;
+  userMemory: Record<number, number>;
   userGraph: Record<string, number>;
   messages: Array<Message>;
   userCount: number;
   userType: Array<number>;
+  userLife: Array<number>;
   userFlowTags: Array<Array<number>>;
 }
 
@@ -21,6 +22,7 @@ export let progress:Progress = {
   userGraph: {},
   messages: [],
   userType: [],
+  userLife: [],
   userCount: 0,
   userFlowTags: []
 }
@@ -34,6 +36,7 @@ export function resetProgress()
     userGraph: {},
     messages: [],
     userType: [],
+    userLife: [],
     userCount: 0,
     userFlowTags: []
   };
@@ -130,16 +133,6 @@ function changeAttitude(a:number, b:number, d:number):number
   return d;
 }
 
-function updateUser(user:number,delta:number)
-{
-  // const ipds:Record<number,number> = {};
-  // let norm = 0;
-  // for(let o=user;o<progress.userCount;o++)
-  // {
-  //   const grad = -ipds[o]/norm;
-  // }
-}
-
 const threshold = 0;
 
 export function instability(p:number,log:boolean=false)
@@ -148,9 +141,11 @@ export function instability(p:number,log:boolean=false)
   const Gpp = rGet(p,p);
   for(let x=0;x<progress.userCount;x++)
   {
+    if (!userAvaliable(x)) continue;
     const Gpx = rGet(p,x);
     for(let o=x;o<progress.userCount;o++)
     {
+      if (!userAvaliable(o)) continue;
       const Gpo = rGet(p,o);
       const Gox = rGet(o,x);
       // const i = Gpx*Gpo*Gox-Gpp;
@@ -183,6 +178,7 @@ function instabilityPartialD(p:number,o:number)
   const Gpo = rGet(p,o);
   for(let x=0;x<progress.userCount;x++)
   {
+    if (!userAvaliable(x)) continue;
     const Gox = rGet(o,x);
     const Gpx = rGet(p,x);
     // const i1=-Math.min(Gpo*Gox*Gpx-Gpp,0);
@@ -225,11 +221,8 @@ function instabilityPartialD(p:number,o:number)
 export async function pushMsgToUser(msg:Message, user:number)
 {
   if (user==msg.a) return;
-  if(!(user in progress.userMemory))
-  {
-    progress.userMemory[user] = [];
-  }
-  progress.userMemory[user].push(msg.id);
+  progress.userMemory[msg.i] = msg.j;
+  progress.userMemory[msg.j] = msg.i;
   const oldGij = rGet(msg.i,msg.j);
   const oldInstability = instability(user);
   rSet(msg.i,msg.j,msg.v);
@@ -248,15 +241,26 @@ export async function pushMsgToUser(msg:Message, user:number)
   emit('messageGainedScore',Math.ceil((Math.abs(d)+Math.max(d,0)))*5);
 }
 
+export function userAvaliable(user:number)
+{
+  return progress.userLife[user]!=0;
+}
+
 export function updateUsers(delta:number)
 {
   for(let p=0;p<progress.userCount;p++)
   {
+    if(!userAvaliable(p)) continue;
+    if (progress.userLife[p]>0)
+    {
+      progress.userLife[p] = Math.max(progress.userLife[p]-delta,0);
+    }
     if(progress.userType[p]!=0) continue;
     let maxIpo = -1;
     let maxIpo_o = -1;
     for(let o=p+1;o<progress.userCount;o++)
     {
+      if(!userAvaliable(o)) continue;
       // if(progress.userType[o]==1)
       // {
       //   if (Math.abs(rGet(p,o))<0.6)
@@ -265,7 +269,7 @@ export function updateUsers(delta:number)
       //     continue;
       //   }
       // }
-      const ipo = -instabilityPartialD(p,o) * (rGet(p,o)>0?1:0.9);
+      const ipo = -instabilityPartialD(p,o) * (progress.userMemory[p]==o?0.5:1);
       if (Math.abs(ipo) > Math.abs(maxIpo))
       {
         maxIpo = ipo;
@@ -307,11 +311,12 @@ export function getRepulsion(i:number, j:number):boolean
     return repulsion;
 }
 
-export function createUser(type:number,name:string='',prompt:string='',randomRelationship:boolean=false)
+export function createUser(type:number,name:string='',prompt:string='',randomRelationship:boolean=false,life:number=-1)
 {
     const id = progress.userCount;
     progress.userCount += 1;
     progress.userType.push(type);
+    progress.userLife.push(life);
     if(name=='')
     {
       text.userTexts.push({
@@ -365,4 +370,15 @@ export function executeCommand(cmd:string[])
   {
     debugMode = !debugMode;
   }
+}
+
+export function hasRelationship(a:number,b:number):boolean
+{
+  if (Math.abs(rGet(a,b))>=0.5) return true;
+  for(let x=0;x<progress.userCount;x++)
+  {
+    if(!userAvaliable(x)) continue;
+    if (Math.abs(rGet(a,x))>=0.5&&Math.abs(rGet(b,x))>=0.5) return true;
+  }
+  return false;
 }

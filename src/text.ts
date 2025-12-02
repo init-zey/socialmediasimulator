@@ -59,19 +59,20 @@ export function getUserName(id:number):string
 {
     if (id<0 || id>=text.userTexts.length) return userNames[id%userNames.length];
     const name = text.userTexts[id].name;
-    if (progress.userType[id]==1) return '#'+name;
+    if (progress.userType[id]!=0) return '#'+name;
     return name;
 }
 
 function getFullUserPrompt(id:number)
 {
-    // const basicPrompt = getUserText(id).prompt;
-    let historyContainer = "";
-    if (id in progress.userMemory && progress.userMemory[id].length>0)
-    {
-        historyContainer = `你需要参考的信息：[${progress.userMemory[id].filter(m=>m<text.messageTexts.length).map(m=>text.messageTexts[m].minimumVersion).join()}]。`;
-    }
-    return `${historyContainer}`;
+    const basicPrompt = getUserText(id).prompt;
+    return basicPrompt;
+    // let historyContainer = "";
+    // if (id in progress.userMemory)
+    // {
+    //     historyContainer = `你需要参考的信息：[${progress.userMemory[id].filter(m=>m<text.messageTexts.length).map(m=>text.messageTexts[m].minimumVersion).join()}]。`;
+    // }
+    // return `${historyContainer}`;
 }
 
 const traits:Array<string> = ["神经质","幽默","严肃"];

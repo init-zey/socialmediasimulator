@@ -626,6 +626,8 @@ html, body
 #app
 {
     position: fixed;
+    width: 100vw;
+    height: 100vh;
 }
 .vintage {
     transition-property: opacity;

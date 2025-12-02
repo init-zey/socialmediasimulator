@@ -181,8 +181,8 @@ function onTouchMove(e: TouchEvent)
         const touch = e.touches[0];
         mouseX = touch.clientX;
         mouseY = touch.clientY;
-        x.value = mouseX - touchStartX + touchStartCanvasX;
-        y.value = mouseY - touchStartY + touchStartCanvasY;
+        x.value = (mouseX - touchStartX) / s.value + touchStartCanvasX;
+        y.value = (mouseY - touchStartY) / s.value + touchStartCanvasY;
     }
     else if (e.touches.length == 2)
     {
@@ -272,7 +272,15 @@ function changeScale(mx:number, my:number, delta:number)
     let s1 = s.value;
     let mx1 = mx / s1 - x.value;
     let my1 = my / s1 - y.value;
-    s.value *= delta;
+    s.value *= Math.max(Math.min(delta,2),0.5);
+    if (s.value < 0.1)
+    {
+        s.value = 0.1;
+    }
+    else if (s.value > 10)
+    {
+        s.value = 10;
+    }
     let s2 = s.value;
     let mx2 = mx / s2 - x.value;
     let my2 = my / s2 - y.value;

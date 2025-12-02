@@ -7,7 +7,7 @@ import { emit, subscribe } from './event';
 import { NPageHeader, NTag, NSpace, NDrawer, NDrawerContent, NButton, NModal, NIcon, NRow, NCol, NNumberAnimation, NStatistic, useMessage, NFlex, NCard, NDivider, NThing, NProgress, NConfigProvider, darkTheme } from 'naive-ui';
 import { getUserName, loadText, processGenerateQueue, resetText, text } from './text';
 import { startGenerateMessage } from './text';
-import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1 } from '@vicons/carbon'
+import { View, ThumbsUp, AnalyticsReference, AiResultsHigh, Time, Network1, WindowAuto } from '@vicons/carbon'
 import StatusBar from './components/StatusBar.vue';
 import { missions } from './mission';
 
@@ -281,10 +281,9 @@ subscribe('addedMessage', (msg:Message)=>startGenerateMessage(msg));
 setInterval(() => {
     processGenerateQueue();
 }, 100);
-setInterval(() => {
-    windowWidth.value = window.innerWidth;
-}, 1);
-const windowWidth = ref(0);
+const gameWindow = window;
+const gameNavigator = navigator;
+const mobileAgents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"];
 subscribe('viewedMessage',(view)=>{
     collectedMessageStatistic.value.views += view;
 });
@@ -417,7 +416,7 @@ function randomCreateTopic()
         <template #suffix>
         </template>
     </MessageList>-->
-        <n-drawer to="#app" v-model:show="showEditorDrawer" :width="windowWidth>500?500:windowWidth">
+        <n-drawer to="#app" v-model:show="showEditorDrawer" :width="gameWindow.innerWidth>500?500:gameWindow.innerWidth">
             <n-drawer-content :native-scrollbar="false">
                 <template #header>
                     <n-page-header subtitle="关系分析" @back="showEditorDrawer=false"></n-page-header>
@@ -483,7 +482,7 @@ function randomCreateTopic()
             <div style="margin:auto;color:gainsboro">
                 <a style="color:gainsboro;text-decoration: none;" href="https://github.com/init-zey/socialmediasimulator">社媒算法模拟器</a>@吉士蛋麦芬三明治
             </div>
-            <n-button style="margin-top: auto;margin-bottom: auto;" size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
+            <n-button style="margin-top: auto;margin-bottom: auto;" size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}}{{mobileAgents.some(agent => gameNavigator.userAgent.includes(agent))?'':' Space'}}</n-button>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
             <p>我们的平台快要寿终正寝了，作为推送算法，我们该做点事情。</p>

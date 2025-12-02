@@ -2,7 +2,7 @@
   <div class="canvas-user" @click="onClick">
     <span class="username"> {{ getUserName(user.id) }} </span>
     <!-- <n-tag class="username"> {{ userInstability }} </n-tag> -->
-    <div v-if="bubbleTextLife>0" class="bubble">
+    <div v-if="bubbleTextLife<=0" class="bubble">
       {{ bubbleText }}
     </div>
   </div>
@@ -22,7 +22,7 @@ function onClick()
 {
   emit('userPressed', props.user.id);
 }
-const bubbleText = ref('');
+const bubbleText = ref('hello world');
 const bubbleTextLife = ref(0);
 let bubbleEvent = 0;
 // const userInstability = ref(0);
@@ -72,7 +72,7 @@ onBeforeUnmount(()=>{
 {
   font-weight: 300;
   position: absolute;
-  top: -40px;
+  top: -80%;
   white-space: nowrap;
   text-align: center;
   width: min-content;

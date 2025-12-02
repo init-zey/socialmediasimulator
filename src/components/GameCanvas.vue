@@ -518,7 +518,6 @@ function redraw()
 let draggingUser = -1;
 function pointerMoved(ex:number, ey:number)
 {
-    console.log('pointer moved');
     if (draggingUser != -1)
     {
         const user = users.value[draggingUser];

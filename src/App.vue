@@ -401,7 +401,7 @@ function randomCreateTopic()
         <template #suffix>
         </template>
     </MessageList>-->
-        <n-drawer v-model:show="showEditorDrawer" :width="windowWidth>500?500:windowWidth">
+        <n-drawer to="#app" v-model:show="showEditorDrawer" :width="windowWidth>500?500:windowWidth">
             <n-drawer-content :native-scrollbar="false">
                 <template #header>
                     <n-page-header subtitle="关系分析" @back="showEditorDrawer=false"></n-page-header>
@@ -513,7 +513,7 @@ function randomCreateTopic()
 </template>
 
 <style>
-body
+html, body
 {
     margin: 0;
     overflow: hidden;

@@ -438,7 +438,7 @@ function randomCreateTopic()
                 <center><n-button @click="gameEnded=false;resetProgress();gameInit();">重新开始</n-button></center>
             </template>
         </n-modal>
-        <div class="pageside" style="position: absolute;top: 0;left: 0;right: 0;">
+        <div class="pageside" style="top: 0;left: 0;right: 0;">
             <n-space class="missions" style="margin-bottom: auto;" vertical>
                 <b>任务列表</b>
                 <div v-if="appState.missionCount>0">
@@ -465,7 +465,7 @@ function randomCreateTopic()
                 <n-button @click="showHelp=!showHelp" :type="'info'">查看帮助</n-button>
             </div>
         </div>
-        <div class="pageside" style="position:absolute;bottom: 0;left: 0;right: 0;background: white; color:black; margin:0; box-shadow: 0 0 3px rgba(1,1,1,0.3);padding: 0.5em;">
+        <div class="pageside" style="bottom: 0;left: 0;right: 0;background: white; color:black; margin:0; box-shadow: 0 0 3px rgba(1,1,1,0.3);padding: 0.5em;">
             <div class="buttons" style="margin-top:auto">
                 <n-flex>
                     <n-button size="large" @click="showStore=true">平台策略</n-button>
@@ -477,7 +477,7 @@ function randomCreateTopic()
             <div style="margin:auto;color:gainsboro">
                 <a style="color:gainsboro;text-decoration: none;" href="https://github.com/init-zey/socialmediasimulator">社媒算法模拟器</a>@吉士蛋麦芬三明治
             </div>
-            <n-button size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
+            <n-button style="margin: auto;" size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">
             <p>我们的平台快要寿终正寝了，作为推送算法，我们该做点事情。</p>
@@ -570,6 +570,7 @@ html, body
 }
 .pageside
 {
+    position: fixed;
     pointer-events: none;
     flex: 0;
     display:flex;

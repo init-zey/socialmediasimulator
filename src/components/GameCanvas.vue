@@ -12,6 +12,7 @@
         @touchstart="onTouchStart"
         @touchmove="onTouchMove"
         @touchend="onTouchEnd"
+        @pointermove="(e)=>pointerMoved(e.movementX,e.movementY)"
         @wheel="onWheel">
     </div>
     <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id)&&isUserInWindow(user))" :key="user.id"

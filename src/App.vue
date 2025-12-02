@@ -474,6 +474,9 @@ function randomCreateTopic()
                     </div>
                 </n-flex>
             </div>
+            <div style="margin:auto;color:gainsboro">
+                <a style="color:gainsboro;text-decoration: none;" href="https://github.com/init-zey/socialmediasimulator">社媒算法模拟器</a>@吉士蛋麦芬三明治
+            </div>
             <n-button size="large" @click="appState.paused=!appState.paused;emit('missionProceed','start3',1)">{{appState.paused?'继续':'暂停'}} Space</n-button>
         </div>
         <n-modal v-model:show="showHelp" style="width: auto; margin: auto;" title="帮助" preset="card">

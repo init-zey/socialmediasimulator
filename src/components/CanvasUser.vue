@@ -2,7 +2,7 @@
   <div class="canvas-user" @click="onClick">
     <span class="username"> {{ getUserName(user.id) }} </span>
     <!-- <n-tag class="username"> {{ userInstability }} </n-tag> -->
-    <div v-if="bubbleTextLife>=0" class="bubble">
+    <div v-if="bubbleTextLife>0" class="bubble">
       {{ bubbleText }}
     </div>
   </div>

@@ -5,8 +5,33 @@
             'border-radius': ((progress.userType[user.id]==0)?50:0)+'%', -->
     <div class="canvas-bg2" :style="{'background-size': 80*s+'px '+80*s+'px', 'background-position': x*s+'px '+y*s+'px'}"
     ></div>
-    <div class="mouse-input-handler" @mousedown="onMousedown" @mouseup="onMouseup" @mousemove="onMousemove" @touchstart="onTouchStart" @touchend="onTouchEnd" @touchmove="onTouchMove" @wheel="onWheel" @pointermove="pointerMoved"></div>
-    <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id)&&isUserInWindow(user))" :key="user.id" @pointerdown="draggingUser=user.id" @pointerup="draggingUser=-1" @pointermove="pointerMoved"
+    <div class="mouse-input-handler"
+        @mousedown="onMousedown"
+        @mouseup="onMouseup"
+        @mousemove="onMousemove"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+        @wheel="onWheel">
+    </div>
+    <CanvasUser v-for="user in users.filter(user=>userAvaliable(user.id)&&isUserInWindow(user))" :key="user.id"
+        @pointerdown="draggingUser=user.id"
+        @mousemove="(e:MouseEvent)=>pointerMoved(e.movementX,e.movementY)"
+        @pointerup="draggingUser=-1"
+        @touchstart="(e:TouchEvent)=>{
+            const touch = e.touches[0];
+            mouseX = touch.clientX;
+            mouseY = touch.clientY;
+        }"
+        @touchmove="(e:TouchEvent)=>{
+            const touch = e.touches[0];
+            const dx = touch.clientX-mouseX;
+            const dy = touch.clientY-mouseY;
+            pointerMoved(dx,dy);
+            mouseX=touch.clientX;
+            mouseY=touch.clientY;
+        }"
+        @touchend="draggingUser=-1"
         :user="user" :selected="appState?.selectedUsers.includes(user.id)??false" :focused="appState?.focusedUser==user.id"
         :style="{left: calcX(user) + 'px', top: calcY(user) + 'px',
             'font-weight': appState?.selectedUsers.includes(user.id)?'600':'300',
@@ -35,7 +60,7 @@ function isUserInWindow(user:User)
 {
     const scrX = calcX(user);
     const scrY = calcY(user);
-    return scrX > 0 && scrX < window.innerWidth && scrY > 0 && scrY < window.innerHeight;
+    return scrX > -100 && scrX < window.innerWidth + 100 && scrY > -100 && scrY < window.innerHeight + 100;
 }
 export interface User {
     id: number;
@@ -490,14 +515,14 @@ function redraw()
     }
 }
 let draggingUser = -1;
-function pointerMoved(e:PointerEvent)
+function pointerMoved(ex:number, ey:number)
 {
-    if (draggingUser != -1 && e.buttons==1)
+    console.log('pointer moved');
+    if (draggingUser != -1)
     {
-        e.preventDefault();
         const user = users.value[draggingUser];
-        user.x += e.movementX / s.value;
-        user.y += e.movementY / s.value;
+        user.x += ex / s.value;
+        user.y += ey / s.value;
     }
 }
 </script>

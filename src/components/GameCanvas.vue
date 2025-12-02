@@ -481,8 +481,8 @@ function pointerMoved(e:PointerEvent)
 .canvas
 {
     position: absolute;
-    width: 100vw;
-    height: 100vh;
+    width: 100dvw;
+    height: 100dvh;
     scroll-behavior:unset;
     background-image:
         linear-gradient(to right, #eeeeee, 1px, transparent 1px),
